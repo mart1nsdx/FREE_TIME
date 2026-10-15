@@ -1,0 +1,8 @@
+# Autosave y archivos de MATLAB
+*.asv
+*.m~
+slprj/
+*.autosave
+
+# Salida de make_mlx_in_matlab.m (binario, se regenera dentro de MATLAB)
+*.mlx
