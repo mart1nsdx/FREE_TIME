@@ -1,151 +1,150 @@
-# MATLAB_RADAR — Diseño y análisis de radar para detección de drones
+# MATLAB_RADAR — Radar design and analysis for drone detection
 
-Colección de scripts de MATLAB (Radar Toolbox, Phased Array System Toolbox,
-Antenna Toolbox) para el diseño y análisis de un radar **PMCW** (Phase-
-Modulated Continuous Wave) orientado a la detección de UAVs pequeños, más el
-diseño físico preliminar del arreglo de antenas en 79 GHz que lo alimentaría.
-Es, junto con `unmanned/` y `aerodynamical_controls/`, la tercera pieza del
-problema: los otros dos simulan cómo vuela y se controla el vehículo; esto
-simula **cómo detectarlo** desde tierra.
+Collection of MATLAB scripts (Radar Toolbox, Phased Array System Toolbox,
+Antenna Toolbox) for designing and analyzing a **PMCW** (Phase-Modulated
+Continuous Wave) radar aimed at detecting small UAVs, plus the preliminary
+physical design of the 79 GHz antenna array that would feed it. Together
+with `unmanned/` and `aerodynamical_controls/`, it's the third piece of the
+puzzle: the other two simulate how a vehicle flies and is controlled; this
+one simulates **how to detect it** from the ground.
 
-A diferencia de `unmanned/` y `aerodynamical_controls/`, este no es un único
-programa con una demo clara: es una colección de iteraciones de diseño
-(v1 → v2 → PMCW corregido → arreglo físico en 79 GHz) guardadas tal como se
-fueron generando, varias de ellas exportadas directamente desde las apps
-*Radar Designer* y *Sensor Array Analyzer* de MATLAB. Se documentan todas
-para que se entienda qué prueba cada una y en qué orden aparecieron.
+Unlike `unmanned/` and `aerodynamical_controls/`, this isn't a single
+program with one clear demo: it's a collection of design iterations
+(v1 → v2 → corrected PMCW → 79 GHz physical array) kept as they were
+generated, several of them exported directly from MATLAB's *Radar
+Designer* and *Sensor Array Analyzer* apps. All of them are documented here
+so it's clear what each one tests and in what order they appeared.
 
-## Estructura
+## Structure
 
-| Archivo / carpeta | Rol |
+| File / folder | Role |
 |---|---|
-| `PMCW.m`, `v3_PMCW.m` | Script principal de análisis de detectabilidad del radar PMCW (idénticos byte a byte — `v3_PMCW.m` es la copia de la última iteración guardada con nombre de versión). Ver [§1](#1-pmcwm--v3_pmcwm-análisis-de-detectabilidad-pmcw). |
-| `array_script.m` | Export de la app *Sensor Array Analyzer*: arreglo URA 8×8 con taper de Taylor, replicado 2×2, a 81 GHz. Estudio preliminar de patrón de array, anterior al diseño físico de `PMCW_79GHz_Array_Design_Package/`. Ver [§2](#2-array_scriptm--estudio-de-patrón-del-arreglo). |
-| `PMCW_79GHz_Array_Design_Package/` | Diseño físico preliminar del arreglo de antenas de 79 GHz (parche inset-fed, red de alimentación, 4 paneles basculados, 64 canales Tx/64 Rx) que alimentaría al radar PMCW. Trae su propio `README_PMCW_79GHz_Array.txt`. Ver [§3](#3-pmcw_79ghz_array_design_package--diseño-físico-del-arreglo-de-antenas). |
-| `v2_solution/` | Iteración anterior del análisis de radar: exports crudos de *Radar Designer* (`radar1_*.m`, preset genérico `AirborneRadar`) junto a las versiones ya adaptadas a detección de drones (`Pmcw_*.m`), con dos modelos de propagación atmosférica distintos. Ver [§4](#4-v2_solution--iteración-anterior-del-análisis-de-radar). |
-| `radar_scrips/PatchFisico_&_array_ComplexGeometries/array_v1_porfin.mat` | Datos de una primera iteración ("v1") de geometría de arreglo/parche con geometrías complejas — sin script asociado, solo el `.mat` con los resultados. |
-| `RADAR_BUENO.mat` | Export de *Radar Toolbox* con los parámetros del radar ya ajustado ("bueno" = la versión validada). Lo importa opcionalmente `PMCW_79GHz_Array_Design_Package/PMCW_79GHz_Array_Design_LiveScript_Source.m` (§3) para listar sus campos si está presente. |
+| `PMCW.m`, `v3_PMCW.m` | Main PMCW radar detectability-analysis script (byte-for-byte identical — `v3_PMCW.m` is the copy saved with a version name for the latest iteration). See [§1](#1-pmcwm--v3_pmcwm--pmcw-detectability-analysis). |
+| `array_script.m` | Export from the *Sensor Array Analyzer* app: 8×8 URA array with Taylor taper, 2×2 replicated, at 81 GHz. Preliminary array-pattern study, predating the physical design in `PMCW_79GHz_Array_Design_Package/`. See [§2](#2-array_scriptm--array-pattern-study). |
+| `PMCW_79GHz_Array_Design_Package/` | Preliminary physical design of the 79 GHz antenna array (inset-fed patch, feed network, 4 tilted panels, 64 Tx/64 Rx channels) that would feed the PMCW radar. Ships its own `README_PMCW_79GHz_Array.txt`. See [§3](#3-pmcw_79ghz_array_design_package--physical-antenna-array-design). |
+| `v2_solution/` | Previous iteration of the radar analysis: raw *Radar Designer* exports (`radar1_*.m`, generic `AirborneRadar` preset) alongside the versions already adapted for drone detection (`Pmcw_*.m`), with two different atmospheric-propagation models. See [§4](#4-v2_solution--previous-iteration-of-the-radar-analysis). |
+| `radar_scrips/PatchFisico_&_array_ComplexGeometries/array_v1_porfin.mat` | Data from a first ("v1") iteration of array/patch geometry with complex geometries — no associated script, just the `.mat` results. |
+| `RADAR_BUENO.mat` | *Radar Toolbox* export with the already-tuned radar parameters (name is Spanish for "good radar" = the validated version). Optionally imported by `PMCW_79GHz_Array_Design_Package/PMCW_79GHz_Array_Design_LiveScript_Source.m` (§3) to list its fields when present. |
 
-## 1. `PMCW.m` / `v3_PMCW.m` — análisis de detectabilidad PMCW
+## 1. `PMCW.m` / `v3_PMCW.m` — PMCW detectability analysis
 
-Adaptación de un export de *Radar Toolbox* (`TrackingRadar`) de pulsos a un
-radar de **onda continua modulada en fase** (PMCW), mapeando los parámetros
-de un radar pulsado a los de PMCW:
+Adapts a pulsed-radar *Radar Toolbox* export (`TrackingRadar`) to a
+**Phase-Modulated Continuous Wave** radar, mapping pulsed-radar parameters
+to PMCW ones:
 
 ```
-Duracion de un chip (1/B)          -> Pulsewidth   (energia de una sola muestra)
-Chips por CPI (B x T_int)          -> NumCoherentPulses  (ganancia de correlacion)
-Potencia promedio (CW, duty=100%)  -> PeakPower
+Chip duration (1/B)                -> Pulsewidth   (single-sample energy)
+Chips per CPI (B x T_int)          -> NumCoherentPulses  (correlation gain)
+Average power (CW, duty=100%)      -> PeakPower
 ```
 
-**Forma de onda:** ancho de banda del código 15 MHz (chip ≈ 66.7 ns),
-tiempo de integración coherente 10 ms (150 000 chips/CPI), código Gold de
-1023 chips, potencia promedio 125 W, ganancia de procesamiento
-`10·log10(NumChips) ≈ 51.8 dB`.
+**Waveform:** 15 MHz code bandwidth (chip ≈ 66.7 ns), 10 ms coherent
+integration time (150,000 chips/CPI), 1023-chip Gold code, 125 W average
+power, processing gain `10·log10(NumChips) ≈ 51.8 dB`.
 
-**Radar equivalente (`designRadarPMCW`):** antena de 4×[8×8] = 256
-elementos (patrón sinc), frecuencia 10 GHz, CFAR GOCA (*Greatest-Of Cell
-Averaging*), M-de-N binario (detecta en ≥1 de 2 CPIs), STC (*sensitivity
-time control*) con corte a 1000 m.
+**Equivalent radar (`designRadarPMCW`):** 4×[8×8] = 256-element antenna
+(sinc pattern), 10 GHz frequency, GOCA CFAR (*Greatest-Of Cell Averaging*),
+binary M-of-N (detects in ≥1 of 2 CPIs), STC (*sensitivity time control*)
+cutting off at 1000 m.
 
-**Blanco:** RCS = 1e-3 m² (micro-UAV), fluctuación **Swerling 1**,
-elevación 5°.
+**Target:** RCS = 1e-3 m² (micro-UAV), **Swerling 1** fluctuation, 5°
+elevation.
 
-**Presupuesto de detectabilidad** (`effectiveDetectability` /
-`detectabilityComponents`): descompone el SNR requerido en 7 términos —
-detectabilidad de un solo chip (Swerling 0), pérdida por fluctuación
-Swerling 1, ganancia de correlación PMCW, pérdida CFAR, pérdida de forma de
-haz, pérdida de barrido electrónico del array y pérdidas propias
-(aislación Tx/Rx) — más una ganancia adicional por integración binaria
-entre 2 CPIs.
+**Detectability budget** (`effectiveDetectability` /
+`detectabilityComponents`): breaks the required SNR down into 7 terms —
+single-chip detectability (Swerling 0), Swerling-1 fluctuation loss, PMCW
+correlation gain, CFAR loss, beam-shape loss, array electronic-scan loss,
+and custom losses (Tx/Rx isolation) — plus an additional gain from binary
+integration across 2 CPIs.
 
-**Pérdidas de propagación:** `radarpropfactor` (multipath/difracción sobre
-tierra curva), más pérdidas atmosféricas (`tropopl`, gas) y de lente
-(`lenspl`) por el modelo de **radio efectivo de la Tierra** (4/3).
+**Propagation losses:** `radarpropfactor` (multipath/diffraction over
+curved earth), plus atmospheric losses (`tropopl`, gas) and lens loss
+(`lenspl`) under the **effective-earth-radius** model (4/3).
 
-**Salida (4 figuras):** SNR vs. rango, Pd vs. rango (contra umbral 70% /
-objetivo 95%), presupuesto de enlace (*link budget*, barra apilada por
-componente) y cobertura rango-Doppler (mapa de calor de SNR + máscara de
-detección, con pérdida por desajuste Doppler tipo `sinc²`).
+**Output (4 figures):** SNR vs. range, Pd vs. range (against a 70%
+threshold / 95% objective), link budget (stacked bar per component), and
+range-Doppler coverage (SNR heat map + detection mask, with `sinc²`-type
+Doppler-mismatch loss).
 
-## 2. `array_script.m` — estudio de patrón del arreglo
+## 2. `array_script.m` — array pattern study
 
-Generado por la app *Sensor Array Analyzer* (Phased Array System Toolbox).
-Arreglo rectangular uniforme (URA) 8×8 con taper de Taylor (−30 dB de lóbulo
-lateral, `nbar=5`) por fila y columna, elemento de patrón sinc (ancho de haz
-120°×120°), replicado en una grilla 2×2 (`ReplicatedSubarray`) con desfasador
-de 3 bits a 81 GHz. Genera 4 gráficos: geometría del arreglo, directividad
-3D, corte en azimut y corte en elevación. Es el estudio preliminar de patrón
-que precede al diseño físico del parche en `PMCW_79GHz_Array_Design_Package/`.
+Generated by the *Sensor Array Analyzer* app (Phased Array System
+Toolbox). 8×8 uniform rectangular array (URA) with Taylor taper (−30 dB
+sidelobe level, `nbar=5`) per row and column, sinc-pattern element
+(120°×120° beamwidth), replicated on a 2×2 grid (`ReplicatedSubarray`)
+with a 3-bit phase shifter at 81 GHz. Produces 4 plots: array geometry, 3D
+directivity, azimuth cut, and elevation cut. This is the preliminary
+pattern study that precedes the physical patch design in
+`PMCW_79GHz_Array_Design_Package/`.
 
-## 3. `PMCW_79GHz_Array_Design_Package/` — diseño físico del arreglo de antenas
+## 3. `PMCW_79GHz_Array_Design_Package/` — physical antenna array design
 
-Síntesis preliminar (no lista para fabricación) de un arreglo físico de
-**64 canales Tx / 64 Rx** a 79 GHz, inspirado en el nivel de potencia por
-canal de RF de un chipset tipo AWR2943/AWR2944. Contenido real del paquete
-(ver también su propio `README_PMCW_79GHz_Array.txt`):
+Preliminary (not manufacturing-ready) synthesis of a physical **64 Tx /
+64 Rx channel** array at 79 GHz, inspired by the per-channel RF power
+level of an AWR2943/AWR2944-class chipset. Actual package contents (see
+also its own `README_PMCW_79GHz_Array.txt`):
 
-- **Sustrato:** clase RT/duroid 5880 (`er=2.2`, `h=0.127 mm`).
-- **Síntesis del parche** inset-fed: dimensiones de primera pasada
-  `W≈1.50 mm`, `L≈1.20 mm`, offset de alimentación `≈0.42 mm`; tabla de
-  anchos de línea de microcinta para impedancias características de 25 a
-  150 Ω.
-- **Apertura mecánica:** 150×150 mm máximo, repartida en **4 paneles de
-  75×75 mm basculados 10°** en arreglo tipo pirámide.
-- Cada canal de RF alimenta una sub-tila fija de parches 4×4 con
-  ponderación de amplitud (red de alimentación corporativa); total
-  **1024 parches Tx + 1024 parches Rx**.
-- Incluye primera pasada de dimensiones de valla EBG/metamaterial y
-  visualización 3D de la apertura completa (`PMCW_79GHz_Array_3D_Preview.png`,
-  radiadores Tx en azul / Rx en rojo).
-- Salida: `radarAntennaUpdate_79GHz.mat` (generado al correr el script) con
-  frecuencia, potencias, ganancias, anchos de haz, dimensiones del parche,
-  pérdidas de alimentación y temperatura de sistema, para integrar al radar
-  de la sección 1.
-- `make_mlx_in_matlab.m` — convierte la fuente `.m` seccionada a
-  `.mlx` (Live Script) corriéndolo dentro de MATLAB; no ejecutable fuera de
+- **Substrate:** RT/duroid 5880-class (`er=2.2`, `h=0.127 mm`).
+- **Inset-fed patch synthesis:** first-pass dimensions `W≈1.50 mm`,
+  `L≈1.20 mm`, feed offset `≈0.42 mm`; microstrip line-width table for
+  characteristic impedances from 25 to 150 Ω.
+- **Mechanical aperture:** 150×150 mm max, split across **four 75×75 mm
+  panels tilted 10°** in a pyramid-like arrangement.
+- Each RF channel feeds a fixed 4×4 patch sub-tile with amplitude
+  weighting (corporate feed network); total **1024 Tx patches + 1024 Rx
+  patches**.
+- Includes a first-pass EBG/metamaterial fence dimensioning and a 3D
+  visualization of the full aperture (`PMCW_79GHz_Array_3D_Preview.png`,
+  Tx radiators in blue / Rx in red).
+- Output: `radarAntennaUpdate_79GHz.mat` (generated when the script runs)
+  with frequency, powers, gains, beamwidths, patch dimensions, feed
+  losses, and system temperature, to integrate into the radar from
+  section 1.
+- `make_mlx_in_matlab.m` — converts the sectioned `.m` source to `.mlx`
+  (Live Script) by running it inside MATLAB; not executable outside
   MATLAB.
 
-> Nota de ingeniería explícita en el propio paquete: es una síntesis de
-> primera pasada y una simulación de factor de arreglo, **no** un diseño de
-> PCB de milimétricas listo para manufactura — falta validación con
-> solver electromagnético de onda completa (HFSS, CST, FEKO) y medición.
+> Explicit engineering note from the package itself: this is a first-pass
+> synthesis and array-factor simulation, **not** a manufacturing-ready
+> mmWave PCB design — it still needs full-wave electromagnetic solver
+> validation (HFSS, CST, FEKO) and measurement.
 
-## 4. `v2_solution/` — iteración anterior del análisis de radar
+## 4. `v2_solution/` — previous iteration of the radar analysis
 
-Snapshot de una iteración previa a `PMCW.m`, con dos familias de scripts:
+Snapshot of an iteration prior to `PMCW.m`, with two families of scripts:
 
-- **`radar1_*.m`** — exports crudos de la app *Radar Designer* sobre el
-  preset `AirborneRadar` (genérico, sin adaptar a dron): detectabilidad,
-  reporte de métricas, cobertura vertical. Sirven de línea base / plantilla.
-- **`Pmcw_*.m`** — las mismas tres salidas ya **corregidas para detección de
-  drones pequeños**: RCS = 0.01 m² (−20 dBsm) en vez del valor genérico,
-  elevación del blanco llevada a 0° (peor caso de propagación), fluctuación
-  Swerling 1 (antes Swerling 0), PMCW con `Pulsewidth = 1/PRF` (duty 100% →
-  +3 dB) y lluvia moderada (10 mm/h) en vez de torrencial. Hay **dos
-  variantes del modelo de refracción atmosférica** evaluadas en paralelo:
-  `Pmcw_EffectiveEarthRadius.m` (aproximación de radio efectivo 4/3, la
-  misma que usa `PMCW.m`) y `Pmcw_CRLExponential.m` (modelo exponencial
-  CRPL: `N(h) = Ns·exp(-ce·h)`, más preciso para atmósferas no estándar).
-- `radar1.mat` — datos asociados a esta iteración.
+- **`radar1_*.m`** — raw *Radar Designer* app exports on the generic
+  `AirborneRadar` preset (not drone-adapted): detectability, metrics
+  report, vertical coverage. Serve as a baseline/template.
+- **`Pmcw_*.m`** — the same three outputs already **corrected for small-
+  drone detection**: RCS = 0.01 m² (−20 dBsm) instead of the generic
+  value, target elevation lowered to 0° (worst-case propagation),
+  Swerling 1 fluctuation (previously Swerling 0), PMCW with
+  `Pulsewidth = 1/PRF` (100% duty → +3 dB), and moderate rain (10 mm/h)
+  instead of torrential. There are **two atmospheric-refraction model
+  variants** evaluated side by side: `Pmcw_EffectiveEarthRadius.m` (4/3
+  effective-radius approximation, the same one `PMCW.m` uses) and
+  `Pmcw_CRLExponential.m` (CRPL exponential model:
+  `N(h) = Ns·exp(-ce·h)`, more accurate for non-standard atmospheres).
+- `radar1.mat` — data associated with this iteration.
 
-Es, en esencia, el "antes" de `PMCW.m`: muestra el camino desde un preset
-genérico de la toolbox hasta un radar corregido específicamente para el
-caso de uso (drones pequeños a baja elevación).
+In essence, this is the "before" of `PMCW.m`: it shows the path from a
+generic toolbox preset to a radar corrected specifically for the use case
+(small drones at low elevation).
 
-## Requisitos
+## Requirements
 
-MATLAB con **Radar Toolbox**, **Phased Array System Toolbox** y
-**Antenna Toolbox** (generado y probado en R2026a). Los scripts son
-`.m` sueltos, no un proyecto de MATLAB (`.mlx`/`.prj`) empaquetado —
-se corren abriéndolos y ejecutándolos directamente, o con `run('archivo.m')`
-desde la carpeta correspondiente (algunos, como los de
-`PMCW_79GHz_Array_Design_Package/`, esperan sus datos de entrada —
-`RADAR_BUENO.mat`— en la misma carpeta de trabajo).
+MATLAB with **Radar Toolbox**, **Phased Array System Toolbox**, and
+**Antenna Toolbox** (generated and tested on R2026a). The scripts are
+standalone `.m` files, not a packaged MATLAB project (`.mlx`/`.prj`) —
+run them by opening and executing directly, or with `run('file.m')` from
+the corresponding folder (some, like the ones in
+`PMCW_79GHz_Array_Design_Package/`, expect their input data —
+`RADAR_BUENO.mat` — in the same working folder).
 
-## Referencia
+## Reference
 
-MATLAB Radar Toolbox, Phased Array System Toolbox y Antenna Toolbox
-(MathWorks, R2026a). Modelo de refracción CRPL exponencial y de radio
-efectivo de la Tierra: documentación de `radarpropfactor` / `tropopl` /
-`lenspl` de Radar Toolbox.
+MATLAB Radar Toolbox, Phased Array System Toolbox, and Antenna Toolbox
+(MathWorks, R2026a). CRPL exponential and effective-earth-radius
+refraction models: Radar Toolbox documentation for `radarpropfactor` /
+`tropopl` / `lenspl`.

@@ -1,151 +1,161 @@
-# aerodynamical_controls — qué se hizo y cómo correrlo
+# aerodynamical_controls — what was done and how to run it
 
-Fecha: 2026-09-02 (aeroelasticidad anadida el 2026-09-03)
+Date: 2026-09-02 (aeroelasticity added 2026-09-03)
 
-Todo el módulo vive en `simulacion_alerones/`. Es un simulador interactivo de
-la dinámica de **actitud** de un cohete con cuatro aletas traseras en cruz
-(convención Blakelock Fig. 8-2). La documentación completa —deducciones,
-fórmulas, tabla de teclas— está en `simulacion_alerones/README.md`.
+The whole module lives in `simulacion_alerones/`. It's an interactive
+simulator of the **attitude** dynamics of a rocket with four cruciform
+tail fins (Blakelock Fig. 8-2 convention). The full documentation —
+derivations, formulas, key-binding table — is in
+`simulacion_alerones/README.md`.
 
 ---
 
-## Cómo correrlo
+## How to run it
 
 ```bash
 cd simulacion_alerones
 
-make run        # ventana 3D interactiva (OpenGL/GLUT)
-make test       # 55 comprobaciones, sin gráfica
-make paridad    # C++ vs Python, byte a byte
-make figuras    # genera figuras/*.csv para el libro
-make help       # todos los targets
+make run        # interactive 3D window (OpenGL/GLUT)
+make test       # 55 checks, no graphics
+make paridad    # C++ vs Python, byte for byte
+make figuras    # generates figuras/*.csv for the write-up
+make help       # all targets
 ```
 
-Requiere `clang++` con C++17 y OpenGL/GLUT (en macOS vienen con el SDK; en
-Linux, `freeglut3-dev`). El prototipo Python necesita `numpy` y `matplotlib`.
+Requires `clang++` with C++17 and OpenGL/GLUT (bundled with the SDK on
+macOS; `freeglut3-dev` on Linux). The Python prototype needs `numpy` and
+`matplotlib`.
 
-### Modo headless (sin gráfica)
+### Headless mode (no graphics)
 
-REPL por `stdin` que ignora comentarios con `#`, así que se le da de comer
-cualquier fichero. Hay uno por sección teórica:
+A `stdin` REPL that ignores `#` comments, so it can be fed any file. There
+is one per theory section:
 
 ```bash
-./alerones --headless < scripts/desacoplo.txt        # §2  desacoplo por simetría
-./alerones --headless < scripts/amortiguamiento.txt  # §4  con y sin amortiguar
-./alerones --headless < scripts/aeroelasticidad.txt  # §5  aleta flexible
-./alerones --headless < scripts/actuador.txt         # §6  retardo y rate limit
-./alerones --headless < scripts/autopiloto.txt       # §6  escalón de actitud
-./alerones --headless < scripts/regresion.txt        # traza de regresión
+./alerones --headless < scripts/desacoplo.txt        # §2  symmetry decoupling
+./alerones --headless < scripts/amortiguamiento.txt  # §4  with and without damping
+./alerones --headless < scripts/aeroelasticidad.txt  # §5  flexible fin
+./alerones --headless < scripts/actuador.txt         # §6  actuator lag and rate limit
+./alerones --headless < scripts/autopiloto.txt       # §6  attitude step response
+./alerones --headless < scripts/regresion.txt        # regression trace
 ```
 
-`help` dentro del REPL lista los comandos.
+`help` inside the REPL lists the available commands.
 
-### Teclas principales del modo gráfico
+### Main keys in graphics mode
 
-`A` autopiloto · `C` hold · `D` amortiguamiento · `f` aleta flexible/rígida ·
-`F` exagerar la deformación · `S` servo · flechas y `Q`/`E` mando (o
-referencias si el AP está activo) · `1`…`4` + `+`/`-` aleta suelta · `SPACE`
-pausa · `R` reset · `,`/`.` velocidad · `T` vista de cola · `ESC` salir.
-
----
-
-## Qué se hizo (2026-09-02)
-
-Estado de partida: el motor físico, el render y 23 tests ya funcionaban. Lo
-que faltaba, y se completó:
-
-**1. Documentación.** No había `README.md`, y el código citaba §2, §7 y §8 de
-un documento inexistente. Ahora existe, con §1–§9 y una sección explícita de
-alcance ("Qué falta a propósito").
-
-**2. Amortiguamiento aerodinámico (§4)** — era el hueco físico real. Cada
-aleta ve la incidencia inducida por `ω × r_i`. Sin esto, una deflexión
-constante daba una velocidad angular que crecía linealmente para siempre.
-Resultado central: **la matriz de derivadas es diagonal en la misma base de
-irreps que diagonaliza el mando** (`L_p`, `M_q`, `N_r`, cero términos
-cruzados), y `ω` converge a `V·u/brazo`.
-
-**3. Dinámica de actuador (§6)** — `delta_cmd` y `delta` son estados
-distintos; retardo de primer orden más límite de velocidad.
-
-**4. Autopiloto (§6)** — tres PID SISO, uno por irrep, sintonizados por
-asignación de polos sobre el modelo linealizado, así que se resintonizan solos
-al cambiar `V` o la geometría. Las ganancias de guiñada salen **negativas**:
-es `N_du < 0` de la convención Blakelock, no una errata.
-
-**5. Tensor de inercia con `Ixz`** (por defecto 0), para poder mostrar el
-acoplo alabeo–guiñada *inercial*, distinto del aerodinámico.
-
-**6. Bugs cerrados** — `set S_fin`/`b_fin` no recalculaban `AR → CL_delta`;
-`.PHONY` incompleto en el Makefile; faltaba `.gitignore`; el REPL de Python no
-tenía los mismos comandos que el de C++.
-
-**7. Tests: 23 → 55**, y el prototipo `alerones_py/main.py` porteado entero.
+`A` autopilot · `C` hold · `D` damping · `f` flexible/rigid fin ·
+`F` exaggerate deformation · `S` servo · arrow keys and `Q`/`E` for
+command input (or references if the autopilot is active) · `1`…`4` +
+`+`/`-` single fin · `SPACE` pause · `R` reset · `,`/`.` speed ·
+`T` tail view · `ESC` quit.
 
 ---
 
-## Qué se hizo (2026-09-03): aletas flexibles
+## What was done (2026-09-02)
 
-Antes la aleta era una placa infinitamente rígida que iba exactamente donde el
-servo la mandaba. Ahora cada aleta es un **sistema de dos grados de libertad
-excitado por su propia fuerza aerodinámica** (§5 del README):
+Starting state: the physics engine, rendering, and 23 tests already
+worked. What was missing, and got completed:
 
-- **Torsión** sobre el pivote. Es la que importa: entra en el ángulo de ataque
-  y cierra un lazo — la carga retuerce la aleta, y la aleta retorcida cambia la
-  carga. De ahí sale un solo número, la **eficiencia aeroelástica**
-  `eta = 1/(1 + qbar/qbar_car)`, que dice qué fracción del mando llega de
-  verdad al aire.
-- **Flexión** de la punta, con la deformada exacta de un voladizo. No cambia la
-  incidencia (aleta recta): es el modo que *se ve*.
-- El parámetro `e_ea` (distancia del pivote al centro aerodinámico) parte el
-  problema en dos: con el centro aerodinámico por **detrás** se pierde eficacia
-  de mando al ir rápido; con el pivote por detrás la aleta **diverge** por
-  encima de cierta presión dinámica.
-- El autopiloto se sintoniza sobre `eta · M_du`, así que compensa solo la
-  pérdida de autoridad.
+**1. Documentation.** There was no `README.md`, and the code referenced
+§2, §7, and §8 of a document that didn't exist. It now exists, with
+§1–§9 and an explicit scope section ("What's deliberately missing").
 
-Dos cosas que conviene saber:
+**2. Aerodynamic damping (§4)** — this was the real physics gap. Each fin
+sees the incidence induced by `ω × r_i`. Without it, a constant deflection
+produced an angular velocity that grew linearly forever. Central result:
+**the derivative matrix is diagonal in the same irrep basis that
+diagonalizes the command** (`L_p`, `M_q`, `N_r`, zero cross terms), and
+`ω` converges to `V·u/arm`.
 
-- **Los valores por defecto no exageran el efecto.** A 30 m/s se pierde un 0.4%
-  del mando: existe y no se nota. A 486 m/s se pierde la mitad. La lección es
-  que *la aeroelasticidad es cosa de ir rápido*, y falsearla sería mentir sobre
-  a qué régimen pertenece. Para verla a baja velocidad, ablanda la aleta:
-  `set K_theta 5`.
-- **El dibujo sí exagera**, porque la flecha real es de décimas de milímetro.
-  El factor se anuncia en el HUD y la tecla `F` lo cicla (×1 … ×150).
+**3. Actuator dynamics (§6)** — `delta_cmd` and `delta` are distinct
+states; first-order lag plus a rate limit.
 
-Los modos estructurales (37 y 65 Hz) son ahora quienes fijan el paso de
-integración: con `dt = 10 ms` RK4 diverge a NaN. Hay una guarda (`structural_cfl`)
-que avisa en el HUD, al arrancar y tras cualquier `set` que empeore el número.
+**4. Autopilot (§6)** — three SISO PIDs, one per irrep, tuned by pole
+placement on the linearized model, so they retune themselves automatically
+when `V` or the geometry changes. The yaw gains come out **negative**:
+that's `N_du < 0` under the Blakelock convention, not a typo.
 
-**Tests: 55 → 79.** Los casos 15-18 cubren eficiencia estática, caída con la
-presión dinámica, divergencia y el límite de paso.
+**5. Inertia tensor with `Ixz`** (0 by default), to show the *inertial*
+roll-yaw coupling, distinct from the aerodynamic one.
+
+**6. Bugs closed** — `set S_fin`/`b_fin` weren't recomputing
+`AR → CL_delta`; incomplete `.PHONY` in the Makefile; missing
+`.gitignore`; the Python REPL didn't have the same commands as the C++
+one.
+
+**7. Tests: 23 → 55**, and the `alerones_py/main.py` prototype ported in
+full.
 
 ---
 
-## Verificación
+## What was done (2026-09-03): flexible fins
 
-- 79/79 en C++ y en Python.
-- `make paridad` confirma que las dos implementaciones producen la misma traza
-  **byte a byte**, en los 79 casos y en los seis scripts. Son dos
-  implementaciones independientes: no pueden copiarse un error numérico.
-- Compilación limpia con `-Wall`, sin warnings.
+Previously the fin was an infinitely rigid plate that went exactly where
+the servo commanded. Now each fin is a **two-degree-of-freedom system
+excited by its own aerodynamic force** (§5 of the README):
 
-Dos ajustes de impresión hicieron falta para la paridad exacta, ambos
-explicados en §7 del README: las combinaciones antisimétricas (`u_roll`, `L`)
-son cancelación total de cuatro números casi iguales y al converger quedan en
-~1e-31 con el signo dictado por el redondeo (se aplastan a cero por debajo de
-1e-9); y `qbar` se imprime con 4 decimales porque `ρV²/2` cae en empates
-exactos (`x.xxx5`) que C++ y Python rompen en direcciones opuestas.
+- **Torsion** about the pivot. This is the one that matters: it feeds
+  into the angle of attack and closes a loop — the load twists the fin,
+  and the twisted fin changes the load. That produces a single number,
+  the **aeroelastic efficiency** `eta = 1/(1 + qbar/qbar_car)`, which
+  tells you what fraction of the command actually reaches the air.
+- **Bending** of the tip, with the exact deflected shape of a cantilever.
+  It doesn't change the incidence (the fin stays straight): it's the mode
+  you *see*.
+- The `e_ea` parameter (distance from the pivot to the aerodynamic
+  center) splits the problem in two: with the aerodynamic center
+  **behind** the pivot, command effectiveness is lost at high speed; with
+  the pivot behind, the fin **diverges** above a certain dynamic
+  pressure.
+- The autopilot is tuned on `eta · M_du`, so it compensates only for the
+  loss of authority.
+
+Two things worth knowing:
+
+- **The default values don't exaggerate the effect.** At 30 m/s, 0.4% of
+  the command is lost: it exists and isn't noticeable. At 486 m/s, half
+  of it is lost. The takeaway is that *aeroelasticity is a high-speed
+  phenomenon*, and overstating it would misrepresent which regime it
+  belongs to. To see it at low speed, soften the fin: `set K_theta 5`.
+- **The drawing does exaggerate it**, because the real deflection is
+  tenths of a millimeter. The scale factor is shown in the HUD and the
+  `F` key cycles it (×1 … ×150).
+
+The structural modes (37 and 65 Hz) are now what sets the integration
+step: at `dt = 10 ms`, RK4 diverges to NaN. There's a guard
+(`structural_cfl`) that warns in the HUD, at startup, and after any `set`
+that worsens the number.
+
+**Tests: 55 → 79.** Cases 15–18 cover static efficiency, falloff with
+dynamic pressure, divergence, and the step-size limit.
 
 ---
 
-## Alcance: qué NO hace
+## Verification
 
-Simula **solo actitud**. No hay posición, velocidad de traslación, gravedad ni
-empuje: `V` es un parámetro, no un estado. Para el vuelo 6DOF completo está el
-módulo hermano `../unmanned/`. Tampoco modela resistencia de las aletas,
-amortiguamiento del fuselaje, compresibilidad ni histéresis de pérdida. La
-aeroelasticidad de §5 usa aerodinámica cuasi-estacionaria: da bien la
-eficiencia y la divergencia, que son estáticas, pero no una velocidad de flameo
-fiable. El detalle está al final del README.
+- 79/79 in both C++ and Python.
+- `make paridad` confirms both implementations produce the exact same
+  trace **byte for byte**, across the 79 cases and the six scripts. These
+  are two independent implementations: they can't share a numerical bug.
+- Clean compile with `-Wall`, no warnings.
+
+Two print-formatting adjustments were needed for exact parity, both
+explained in §7 of the README: the antisymmetric combinations (`u_roll`,
+`L`) are total cancellation of four nearly-equal numbers and, once
+converged, land at ~1e-31 with the sign set by rounding (flushed to zero
+below 1e-9); and `qbar` is printed with 4 decimals because `ρV²/2` lands
+on exact ties (`x.xxx5`) that C++ and Python round in opposite
+directions.
+
+---
+
+## Scope: what it does NOT do
+
+Simulates **attitude only**. There's no position, translational velocity,
+gravity, or thrust: `V` is a parameter, not a state. For the full 6DOF
+flight, see the sibling module `../unmanned/`. It also doesn't model fin
+drag, fuselage damping, compressibility, or stall hysteresis. The
+aeroelasticity in §5 uses quasi-steady aerodynamics: it gets the
+efficiency and the divergence right, since those are static, but not a
+reliable flutter speed. The detail is at the end of the README.

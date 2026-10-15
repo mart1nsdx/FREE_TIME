@@ -1,87 +1,89 @@
-# simulacion_alerones — Control aerodinámico de un cohete con aletas cruciformes
+# simulacion_alerones — Aerodynamic control of a rocket with cruciform fins
 
-Simulador interactivo de la dinámica de actitud de un cohete gobernado por
-**cuatro aletas traseras en cruz**. El hilo conductor del módulo es un
-resultado de teoría de grupos: la simetría del arreglo diagonaliza a la vez la
-matriz de mando y la de amortiguamiento, y de ahí sale un desacoplo *exacto*
-entre alabeo, cabeceo y guiñada. Ese desacoplo es lo que permite pilotar el
-cohete con tres lazos SISO independientes en lugar de un controlador MIMO.
+Interactive simulator of the attitude dynamics of a rocket governed by
+**four cruciform tail fins**. The thread running through this module is a
+group-theory result: the symmetry of the arrangement simultaneously
+diagonalizes the command matrix and the damping matrix, which yields an
+*exact* decoupling between roll, pitch, and yaw. That decoupling is what
+lets the rocket be piloted with three independent SISO loops instead of a
+MIMO controller.
 
-Convención de ejes y numeración de aletas: **Blakelock, Fig. 8-2**. Las
-inercias por defecto son las de `buildDeltaWingDrone()` en
-[`unmanned/physics_UAV.h`](../../unmanned/physics_UAV.h), para que los dos
-módulos hablen del mismo vehículo.
+Axis convention and fin numbering: **Blakelock, Fig. 8-2**. The default
+inertias are those of `buildDeltaWingDrone()` in
+[`unmanned/physics_UAV.h`](../../unmanned/physics_UAV.h), so both modules
+talk about the same vehicle.
 
-![Simulación interactiva: cohete con aletas cruciformes, vista de cola y HUD de actitud/amortiguamiento/autopiloto](aerodynamical_controls.png)
-*Vista real de `alerones` corriendo: vuelo 3D con las cuatro aletas
-deflectadas, ventana de "vista de cola" (abajo) y HUD con actitud,
-flexiones, amortiguamiento y estado del autopiloto (derecha).*
+![Interactive simulation: rocket with cruciform fins, tail view, and attitude/damping/autopilot HUD](aerodynamical_controls.png)
+*Real view of `alerones` running: 3D flight with all four fins deflected,
+a "tail view" window (bottom), and an HUD with attitude, flexing, damping,
+and autopilot status (right).*
 
-## Estructura
+## Structure
 
-| Archivo | Rol |
+| File | Role |
 |---|---|
-| `fisica_alerones.hpp` / `.cpp` | Motor físico: mixing, aerodinámica de la aleta, amortiguamiento, aeroelasticidad, actuador, Euler + cuaternión, RK4 y autopiloto. Sin dependencias gráficas. |
-| `alerones_graficos.hpp` / `.cpp` | Render 3D (OpenGL/GLUT), vista de cola, HUD y traducción teclado → comandos. Solo dibuja. |
-| `main.cpp` | Arranque: modo gráfico o REPL `--headless`. |
-| `tests.cpp` | Los 18 casos de validación de §7 (79 comprobaciones). |
-| `alerones_py/main.py` | Prototipo de referencia en Python (§8): mismo modelo, animación matplotlib, REPL y los mismos 79 casos. |
-| `scripts/*.txt` | Guiones para el modo headless, uno por sección teórica. |
-| `Makefile` | `make help` lista todos los targets. |
-| `aerodynamical_controls.png` | Captura real de `alerones` en vuelo, usada arriba en este README. |
+| `fisica_alerones.hpp` / `.cpp` | Physics engine: mixing, fin aerodynamics, damping, aeroelasticity, actuator, Euler + quaternion, RK4, and autopilot. No graphics dependencies. |
+| `alerones_graficos.hpp` / `.cpp` | 3D rendering (OpenGL/GLUT), tail view, HUD, and keyboard-to-command translation. Rendering only. |
+| `main.cpp` | Entry point: graphics mode or `--headless` REPL. |
+| `tests.cpp` | The 18 validation cases from §7 (79 checks). |
+| `alerones_py/main.py` | Python reference prototype (§8): same model, matplotlib animation, REPL, and the same 79 cases. |
+| `scripts/*.txt` | Scripts for headless mode, one per theory section. |
+| `Makefile` | `make help` lists all targets. |
+| `aerodynamical_controls.png` | Real screenshot of `alerones` in flight, used above in this README. |
 
-**Alcance deliberado:** este módulo simula **solo la actitud**. No hay posición
-ni velocidad de traslación: `V` es un parámetro, no un estado, y no hay
-gravedad, empuje ni resistencia. Para el vuelo 6DOF completo está el módulo
-hermano [`unmanned/`](../../unmanned/README.md), que integra las ecuaciones de
-Beard & McLain. Aquí el cohete es un banco de ensayos de actitud: es lo que
-hace falta para ver el desacoplo con claridad, y nada más.
+**Deliberate scope:** this module simulates **attitude only**. There's no
+position or translational velocity: `V` is a parameter, not a state, and
+there's no gravity, thrust, or drag. For the full 6DOF flight, see the
+sibling module [`unmanned/`](../../unmanned/README.md), which integrates
+the Beard & McLain equations. Here the rocket is an attitude test bench:
+just enough to see the decoupling clearly, and nothing more.
 
 ---
 
-## §1 — El modelo de un vistazo
+## §1 — The model at a glance
 
-Estado: cuaternión de actitud `q`, velocidad angular `omega = (p, q, r)` en
-ejes cuerpo, y las cuatro deflexiones `delta`. La cadena completa de un paso:
+State: attitude quaternion `q`, angular velocity `omega = (p, q, r)` in
+body axes, and the four deflections `delta`. The full chain of one step:
 
 ```
-  referencias           canales                deflexiones            momentos
-  de actitud            virtuales              por aleta
+  attitude              virtual                deflections            moments
+  references            channels               per fin
 
   phi_ref  ──┐        ┌─ u_roll  ─┐          ┌─ d1 ─┐              ┌─ L ─┐
   theta_ref ─┼─ §6 ──►├─ u_pitch ─┼── §2 ───►├─ d2 ─┼─ §3,§4,§5 ──►├─ M ─┼─► RK4
   psi_ref  ──┘  PID   └─ u_yaw   ─┘  mixing  ├─ d3 ─┤   aero       └─ N ─┘  Euler
                  ▲                           └─ d4 ─┘  + servo §6      │
-                 │                              ▲      + aleta         │
-                 └──────── actitud ─────────────┴──────  flexible ──────┘
+                 │                              ▲      + flexible      │
+                 └──────── attitude ────────────┴──────── fin ─────────┘
 ```
 
-Ejes cuerpo: **x adelante, y derecha, z abajo**. Las aletas van *detrás* del
-CG, en `x_t = -l_t` con `l_t > 0`:
+Body axes: **x forward, y right, z down**. The fins sit *behind* the CG,
+at `x_t = -l_t` with `l_t > 0`:
 
-| Aleta | Posición | Offset radial | Fuerza para `delta > 0` |
+| Fin | Position | Radial offset | Force for `delta > 0` |
 |---|---|---|---|
-| `d1` | derecha | `(x_t, +d, 0)` | `+z` (abajo) |
-| `d2` | izquierda | `(x_t, -d, 0)` | `+z` (abajo) |
-| `d3` | arriba | `(x_t, 0, -d)` | `+y` (derecha) |
-| `d4` | abajo | `(x_t, 0, +d)` | `+y` (derecha) |
+| `d1` | right | `(x_t, +d, 0)` | `+z` (down) |
+| `d2` | left | `(x_t, -d, 0)` | `+z` (down) |
+| `d3` | top | `(x_t, 0, -d)` | `+y` (right) |
+| `d4` | bottom | `(x_t, 0, +d)` | `+y` (right) |
 
-Parámetros por defecto (`params_default()`): aleta de 0.25 × 0.16 m
-(`S = 0.04 m²`), `l_t = 1.75 m`, `d = 0.285 m`, perdida a ±15°, `V = 30 m/s`,
+Default parameters (`params_default()`): 0.25 × 0.16 m fin
+(`S = 0.04 m²`), `l_t = 1.75 m`, `d = 0.285 m`, stall at ±15°, `V = 30 m/s`,
 `rho = 1.225`, `dt = 2 ms`.
 
 ---
 
-## §2 — Simetría V4 y desacoplo
+## §2 — V4 symmetry and decoupling
 
-El arreglo cruciforme tiene grupo de simetría **V4 = Z2 × Z2** (el grupo de
-Klein), generado por dos reflexiones:
+The cruciform arrangement has symmetry group **V4 = Z2 × Z2** (the Klein
+four-group), generated by two reflections:
 
-- `sigma_v` — plano *xz*, intercambia el par horizontal `d1 ↔ d2`
-- `sigma_h` — plano *xy*, intercambia el par vertical `d3 ↔ d4`
+- `sigma_v` — *xz* plane, swaps the horizontal pair `d1 ↔ d2`
+- `sigma_h` — *xy* plane, swaps the vertical pair `d3 ↔ d4`
 
-Las cuatro deflexiones forman una representación *permutacional* de V4. Esa
-representación es reducible, y descomponerla en irreps es un cambio de base:
+The four deflections form a *permutation* representation of V4. That
+representation is reducible, and decomposing it into irreps is a change
+of basis:
 
 ```
   / d1 \   / 1  0   1 \ / u_pitch \          u_pitch = (d1 + d2)/2
@@ -90,167 +92,171 @@ representación es reducible, y descomponerla en irreps es un cambio de base:
   \ d4 /   \ 0  1  -1 /
 ```
 
-> **La matriz de mixing no es un generador del grupo.** Es el cambio de base
-> que diagonaliza la acción del grupo. Los eigenvectores de autovalor +1
-> (modos simétricos) dan cabeceo y guiñada; los de autovalor −1 (modo
-> antisimétrico) dan alabeo.
+> **The mixing matrix is not a generator of the group.** It's the change
+> of basis that diagonalizes the group's action. The eigenvectors with
+> eigenvalue +1 (symmetric modes) give pitch and yaw; the one with
+> eigenvalue −1 (antisymmetric mode) gives roll.
 
-Los momentos que salen son entonces, con `k = qbar · S · CL_delta`:
+The resulting moments are then, with `k = qbar · S · CL_delta`:
 
 ```
-  L =  d   (f1 - f2 + f3 - f4)  =  +4 k d   · u_roll      ← solo el modo antisimétrico
-  M =  l_t (f1 + f2)            =  +2 k l_t · u_pitch     ← solo el par horizontal
-  N = -l_t (f3 + f4)            =  -2 k l_t · u_yaw       ← solo el par vertical
+  L =  d   (f1 - f2 + f3 - f4)  =  +4 k d   · u_roll      ← antisymmetric mode only
+  M =  l_t (f1 + f2)            =  +2 k l_t · u_pitch     ← horizontal pair only
+  N = -l_t (f3 + f4)            =  -2 k l_t · u_yaw       ← vertical pair only
 ```
 
-**El signo de `N` es la convención de Blakelock**, no una errata: con
-`u_yaw > 0` las aletas verticales empujan la cola hacia `+y`, así que la nariz
-se va hacia `-y` y el momento de guiñada es negativo. Ese signo reaparece más
-tarde en las ganancias del autopiloto, que salen negativas en el canal de
-guiñada (§6).
+**The sign of `N` is the Blakelock convention**, not a typo: with
+`u_yaw > 0` the vertical fins push the tail toward `+y`, so the nose goes
+toward `-y` and the yaw moment is negative. That sign reappears later in
+the autopilot gains, which come out negative on the yaw channel (§6).
 
-Valores por defecto (`gains` en el modo headless):
+Default values (`gains` in headless mode):
 
 ```
 k = qbar*S*CL_delta = 47.7029 N/rad
-autoridad   L_du   +54.3813   M_du  +166.9601   N_du  -166.9601  N*m/rad
+authority   L_du   +54.3813   M_du  +166.9601   N_du  -166.9601  N*m/rad
 ```
 
-El alabeo tiene **tres veces menos autoridad** que los otros dos ejes, porque
-su brazo es el offset radial `d = 0.285 m` en vez del brazo de cola
-`l_t = 1.75 m`. Es la razón de que el autopiloto lo sintonice más rápido: hay
-que compensar con ancho de banda lo que falta de palanca.
+Roll has **three times less authority** than the other two axes, because
+its moment arm is the radial offset `d = 0.285 m` instead of the tail arm
+`l_t = 1.75 m`. That's why the autopilot tunes it faster: bandwidth has to
+make up for what's missing in leverage.
 
 ---
 
-## §3 — Aerodinámica de la aleta
+## §3 — Fin aerodynamics
 
-Aleta *all-moving* (gira la superficie entera), así que la deflexión **es** el
-ángulo de ataque y `CL_delta = CL_alpha`. Para el alargamiento bajo típico de
-una aleta de cohete se usa la fórmula de **Helmbold**, que interpola entre la
-teoría de línea sustentadora (AR alto) y la de ala esbelta (AR bajo):
+The fin is *all-moving* (the whole surface rotates), so the deflection
+**is** the angle of attack and `CL_delta = CL_alpha`. For the low aspect
+ratio typical of a rocket fin, **Helmbold's formula** is used, which
+interpolates between lifting-line theory (high AR) and slender-body theory
+(low AR):
 
 ```
   AR = b² / S                    CL_alpha = 2·pi·AR / (2 + sqrt(AR² + 4))
 ```
 
-Con los valores por defecto, `AR = 1.5625` y `CL_delta = 2.1634 1/rad`.
+With the default values, `AR = 1.5625` and `CL_delta = 2.1634 1/rad`.
 
-La fuerza satura por pérdida:
+The force saturates on stall:
 
 ```
   f_i = qbar · S · CL_delta · clamp(delta_i, ±delta_stall)
 ```
 
-Dos decisiones que conviene subrayar:
+Two decisions worth highlighting:
 
-1. **El clamp vive en `fin_forces()`, no en el mixing.** Saturar los canales
-   virtuales rompería el desacoplo; saturar las fuerzas no.
-2. **El clamp se aplica a la incidencia *efectiva*** (§4), no a la comandada.
-   Una aleta puede entrar en pérdida por la rotación del propio cohete aunque
-   el mando sea pequeño.
+1. **The clamp lives in `fin_forces()`, not in the mixing.** Saturating
+   the virtual channels would break the decoupling; saturating the forces
+   doesn't.
+2. **The clamp is applied to the *effective* incidence** (§4), not the
+   commanded one. A fin can stall from the rocket's own rotation even when
+   the command is small.
 
-Post-pérdida la fuerza se mantiene constante. Es un modelo deliberadamente
-simple: sirve para que la saturación exista y sea visible, no para predecir el
-comportamiento real de un perfil en pérdida profunda.
+Past stall the force is held constant. This is a deliberately simple
+model: it exists so that saturation is present and visible, not to
+predict the real behavior of an airfoil in deep stall.
 
 ---
 
-## §4 — Amortiguamiento aerodinámico
+## §4 — Aerodynamic damping
 
-**Este es el resultado central del módulo.** Cuando el cohete gira, cada aleta
-se mueve con él y ve un ángulo de ataque distinto del comandado. La velocidad
-del punto de aplicación es `v_i = omega × r_i`; del par horizontal cuenta la
-componente `z` y del vertical la componente `y`:
+**This is the central result of the module.** As the rocket rotates, each
+fin moves with it and sees an angle of attack different from the
+commanded one. The velocity of the point of application is
+`v_i = omega × r_i`; for the horizontal pair the `z` component counts,
+and for the vertical pair the `y` component:
 
 ```
   (omega × r)_z = p·r_y − q·r_x           (omega × r)_y = r·r_x − p·r_z
 ```
 
-Si la aleta se mueve hacia `+z`, el aire la ataca desde `-z` y su incidencia
-efectiva **baja**. Sustituyendo las cuatro posiciones:
+If the fin moves toward `+z`, the air hits it from `-z` and its effective
+incidence **drops**. Substituting the four positions:
 
 ```
   d1:  delta1 − (q·l_t + p·d)/V           d3:  delta3 + (r·l_t − p·d)/V
   d2:  delta2 − (q·l_t − p·d)/V           d4:  delta4 + (r·l_t + p·d)/V
 ```
 
-Linealizando alrededor de `omega = 0`, las derivadas de estabilidad son:
+Linearizing around `omega = 0`, the stability derivatives are:
 
 ```
   L_p = −4 k d²   / V          M_q = −2 k l_t² / V          N_r = M_q
 ```
 
-y **no hay ningún término cruzado**. La misma simetría V4 que diagonaliza el
-mando diagonaliza la respuesta a la rotación:
+and **there's no cross term at all**. The same V4 symmetry that
+diagonalizes the command also diagonalizes the rotational response:
 
-- una `p` pura desplaza `d1` y `d3` hacia abajo y `d2` y `d4` hacia arriba —
-  el modo antisimétrico, que solo produce `L`;
-- una `q` pura desplaza `d1` y `d2` por igual — el modo simétrico horizontal,
-  que solo produce `M` (sus contribuciones a `L` entran con signo opuesto y se
-  cancelan);
-- una `r` pura hace lo propio con `d3` y `d4`, y solo produce `N`.
+- a pure `p` shifts `d1` and `d3` down and `d2` and `d4` up — the
+  antisymmetric mode, producing only `L`;
+- a pure `q` shifts `d1` and `d2` by the same amount — the horizontal
+  symmetric mode, producing only `M` (their contributions to `L` enter
+  with opposite sign and cancel);
+- a pure `r` does the same with `d3` and `d4`, producing only `N`.
 
-El caso 8 de §7 verifica las tres cosas numéricamente. Con los valores por
-defecto:
+Test case 8 in §7 verifies all three numerically. With the default
+values:
 
 ```
-amortig.    L_p     -0.5166   M_q     -9.7393   N_r     -9.7393  N*m/(rad/s)
+damping     L_p     -0.5166   M_q     -9.7393   N_r     -9.7393  N*m/(rad/s)
 ```
 
-### Consecuencia: el régimen permanente
+### Consequence: the steady-state regime
 
-Sin amortiguamiento, una deflexión constante da una velocidad angular que
-**crece linealmente para siempre**. Con él, `omega` converge, y el equilibrio
-tiene una interpretación limpia: es el punto donde la incidencia efectiva se
-anula, es decir, **la aleta acaba alineada con el flujo local**.
+Without damping, a constant deflection gives an angular velocity that
+**grows linearly forever**. With it, `omega` converges, and the
+equilibrium has a clean interpretation: it's the point where the
+effective incidence goes to zero, i.e. **the fin ends up aligned with the
+local flow**.
 
 ```
   p_ss = +V · u_roll  / d          q_ss = +V · u_pitch / l_t          r_ss = −V · u_yaw / l_t
 ```
 
-Con los valores por defecto: `p = 105.26 · u_roll`, `q = 17.14 · u_pitch`,
-`r = −17.14 · u_yaw`. El alabeo converge seis veces más alto que el cabeceo,
-otra vez por el brazo corto.
+With the default values: `p = 105.26 · u_roll`, `q = 17.14 · u_pitch`,
+`r = −17.14 · u_yaw`. Roll converges six times higher than pitch, again
+because of the short moment arm.
 
-Las constantes de tiempo son largas — `Iyy/|M_q| ≈ 19 s` en cabeceo,
-`Ixx/|L_p| ≈ 31 s` en alabeo — porque las aletas son la *única* superficie
-aerodinámica del modelo. Un cohete real añade el amortiguamiento del fuselaje.
+The time constants are long — `Iyy/|M_q| ≈ 19 s` in pitch,
+`Ixx/|L_p| ≈ 31 s` in roll — because the fins are the model's *only*
+aerodynamic surface. A real rocket adds fuselage damping.
 
-Compáralo tú mismo con la tecla `D` en el modo gráfico, o con
-`scripts/amortiguamiento.txt` en headless.
+Compare it yourself with the `D` key in graphics mode, or with
+`scripts/amortiguamiento.txt` in headless mode.
 
 ---
 
-## §5 — Aeroelasticidad: la aleta deja de ser rígida
+## §5 — Aeroelasticity: the fin stops being rigid
 
-Hasta aquí la aleta era una placa infinitamente rígida que iba exactamente
-donde el servo la mandaba. No lo es. Cada aleta es un **sistema de dos grados
-de libertad excitado por su propia fuerza aerodinámica**:
+Up to this point the fin was an infinitely rigid plate that went exactly
+where the servo commanded. It isn't. Each fin is a **two-degree-of-freedom
+system excited by its own aerodynamic force**:
 
 ```
   [ m_bend   S_theta ] [ w'' ]   [ f - c_w  w'  - K_bend  w  ]
   [ S_theta  I_theta ] [ th''] = [ H - c_th th' - K_theta th ]
 
-  con  H    = -e_ea · f                        (momento de la carga sobre el pivote)
-       c_w  = 2 zeta_bend  sqrt(K_bend  m_bend)
-       c_th = 2 zeta_theta sqrt(K_theta I_theta)
+  where  H    = -e_ea · f                        (load moment about the pivot)
+         c_w  = 2 zeta_bend  sqrt(K_bend  m_bend)
+         c_th = 2 zeta_theta sqrt(K_theta I_theta)
 ```
 
-- **`w`** es la flecha de la punta. La flexión **no cambia la incidencia** —
-  aleta recta, sin flecha en planta — así que es el modo que *se ve*, no el que
-  manda.
-- **`th`** es la torsión sobre el pivote. `K_theta` es rigidez concentrada (eje
-  más rigidez del servo), así que la aleta se retuerce **en bloque**: la
-  torsión es uniforme a lo largo de la envergadura. Y ésta **sí** entra en el
-  ángulo de ataque.
+- **`w`** is the tip deflection. Bending **doesn't change the incidence**
+  — straight fin, no planform camber — so it's the mode you *see*, not
+  the one that steers.
+- **`th`** is the torsion about the pivot. `K_theta` is lumped stiffness
+  (shaft plus servo stiffness), so the fin twists **as a unit**: torsion
+  is uniform along the span. And this one **does** feed into the angle of
+  attack.
 
-`e_ea` es la distancia del **pivote** al **centro aerodinámico**, positiva
-hacia atrás. Es el parámetro que decide todo.
+`e_ea` is the distance from the **pivot** to the **aerodynamic center**,
+positive aft. It's the parameter that decides everything.
 
-### El lazo aeroelástico
+### The aeroelastic loop
 
-La torsión cambia la carga, y la carga cambia la torsión. En equilibrio:
+Torsion changes the load, and the load changes the torsion. At
+equilibrium:
 
 ```
   f = k (delta + th)          K_theta · th = -e_ea · f
@@ -258,134 +264,141 @@ La torsión cambia la carga, y la carga cambia la torsión. En equilibrio:
   =>  delta_eff = delta / (1 + lambda)       lambda = qbar · S · CL_delta · e_ea / K_theta
 ```
 
-De donde la **eficiencia aeroelástica** y la presión dinámica característica:
+From which the **aeroelastic efficiency** and the characteristic dynamic
+pressure follow:
 
 ```
   eta = 1 / (1 + qbar/qbar_car)        qbar_car = K_theta / (S · CL_delta · |e_ea|)
 ```
 
-Un solo número, `eta`, dice qué fracción del mando llega de verdad al aire. Y
-el **signo de `e_ea`** parte el problema en dos regímenes opuestos:
+A single number, `eta`, tells you what fraction of the command actually
+reaches the air. And the **sign of `e_ea`** splits the problem into two
+opposite regimes:
 
-| `e_ea` | Diseño | Qué hace la carga | Consecuencia |
+| `e_ea` | Design | What the load does | Consequence |
 |---|---|---|---|
-| **> 0** | normal: c.a. por detrás del pivote | **destuerce** la aleta | `eta < 1`, cae como `1/qbar`. Siempre estable: se pierde eficacia de mando al ir rápido. |
-| **< 0** | sobrebalanceada: pivote por detrás del c.a. | **aumenta** la incidencia | `eta > 1`, amplifica. Hay una `qbar` de **divergencia** donde `eta → ∞` y la aleta se rompe. |
+| **> 0** | normal: aerodynamic center aft of the pivot | **untwists** the fin | `eta < 1`, falls off as `1/qbar`. Always stable: command effectiveness is lost at high speed. |
+| **< 0** | overbalanced: pivot aft of the aerodynamic center | **increases** the incidence | `eta > 1`, amplifies. There's a **divergence** `qbar` where `eta → ∞` and the fin breaks. |
 
-Con los valores por defecto (`e_ea = 2 cm`, `K_theta = 250 N·m/rad`):
+With the default values (`e_ea = 2 cm`, `K_theta = 250 N·m/rad`):
 
 ```
 flex        eta 0.996198   qbar_car 144448.8 Pa (V = 485.6 m/s)
-modos       flexion 230.9 rad/s (36.8 Hz)   torsion 408.2 rad/s (65.0 Hz)
+modes       bending 230.9 rad/s (36.8 Hz)   torsion 408.2 rad/s (65.0 Hz)
 ```
 
-**La aeroelasticidad es cosa de ir rápido.** A 30 m/s se pierde un 0.4% del
-mando: existe, es real y no se nota. A 200 m/s ya se pierde el 14%, y a 486 m/s
-la mitad. Ésa es la lección, y por eso los valores por defecto **no** exageran
-el efecto: exagerarlo sería mentir sobre a qué régimen pertenece.
+**Aeroelasticity is a high-speed phenomenon.** At 30 m/s, 0.4% of the
+command is lost: it exists, it's real, and it isn't noticeable. At
+200 m/s, 14% is already lost, and at 486 m/s, half of it. That's the
+lesson, and that's why the default values **don't** exaggerate the
+effect: doing so would misrepresent which regime it belongs to.
 
-Para verlo sin ir a Mach 1.5, ablanda la aleta — que es lo que pasa de verdad
-en un cohete pequeño, donde la rigidez la pone el servo y no la placa:
+To see it without going to Mach 1.5, soften the fin — which is what
+actually happens in a small rocket, where stiffness comes from the servo
+rather than the plate:
 
 ```
 set K_theta 5     # eta = 0.8398
-pitch 10          # el servo manda 10 deg...
+pitch 10          # the servo commands 10 deg...
 step 6
-state             # ...pero "eff" dice 8.39763, que es exactamente eta * 10
+state             # ...but "eff" reads 8.39763, exactly eta * 10
 ```
 
-### Los modos estructurales fijan el paso
+### The structural modes set the time step
 
-Los dos modos van a decenas de Hz; el lazo de actitud, a ~1 Hz. Son ellos, y no
-la dinámica del cohete, quienes deciden el `dt`:
+The two modes sit at tens of Hz; the attitude loop, at ~1 Hz. It's them,
+not the rocket's dynamics, that decide the `dt`:
 
 ```
-  CFL = max(w_bend, w_tors) · dt          RK4 es inestable por encima de 2.83
+  CFL = max(w_bend, w_tors) · dt          RK4 is unstable above 2.83
 ```
 
-Con `dt = 2 ms` el CFL es 0.82 y todo va bien. Con `dt = 10 ms` sube a 4.08 y
-la integración **diverge a NaN**. Por eso los casos 9, 10 y 13 de §7, que
-integran cientos de segundos con `dt = 10 ms`, ponen `flex_on = false`
-explícitamente: no es una trampa, es que a ese paso la aleta flexible no se
-puede simular. El código avisa antes de reventar — en el HUD, al arrancar, y
-después de cualquier `set` que empeore el CFL.
+At `dt = 2 ms` the CFL is 0.82 and everything is fine. At `dt = 10 ms` it
+climbs to 4.08 and the integration **diverges to NaN**. That's why test
+cases 9, 10, and 13 in §7, which integrate hundreds of seconds at
+`dt = 10 ms`, explicitly set `flex_on = false`: it's not a workaround, it's
+that the flexible fin simply can't be simulated at that step size. The
+code warns before blowing up — in the HUD, at startup, and after any
+`set` that worsens the CFL.
 
-### Lo que la simetría no rompe
+### What the symmetry doesn't break
 
-La respuesta elástica es ella misma simétrica: un mando de cabeceo carga `d1` y
-`d2` por igual, así que ambas se retuercen y flexan lo mismo, y el momento de
-alabeo sigue siendo **cero exacto**. **El desacoplo de §2 sobrevive a la
-flexibilidad** — el caso 15 de §7 lo comprueba. Lo que sí cambia es la
-ganancia: el autopiloto se sintoniza sobre `eta · M_du`, y por eso sus
-ganancias suben al bajar `eta`.
+The elastic response is itself symmetric: a pitch command loads `d1` and
+`d2` equally, so both twist and bend the same amount, and the roll moment
+stays **exactly zero**. **The decoupling from §2 survives flexibility** —
+test case 15 in §7 confirms it. What does change is the gain: the
+autopilot is tuned on `eta · M_du`, which is why its gains rise as `eta`
+drops.
 
-### Flexión y torsión acopladas: flameo
+### Coupled bending and torsion: flutter
 
-`S_theta` (desequilibrio estático entre los dos modos) es el **único** término
-que los acopla, y por defecto vale 0. Ponlo distinto de cero y aparece el
-modelo binario clásico de **flutter**: por encima de cierta velocidad los dos
-modos se acoplan y el conjunto se vuelve inestable. Con aerodinámica
-cuasi-estacionaria como la de aquí el fenómeno sale cualitativamente bien pero
-no cuantitativamente — para una velocidad de flameo fiable hace falta
-aerodinámica no estacionaria (Theodorsen), que está fuera del alcance de este
-módulo.
+`S_theta` (static imbalance between the two modes) is the **only** term
+coupling them, and defaults to 0. Set it to a nonzero value and the
+classic binary **flutter** model appears: above a certain speed, the two
+modes couple and the system becomes unstable. With quasi-steady
+aerodynamics like the one used here, the phenomenon comes out
+qualitatively right but not quantitatively — a reliable flutter speed
+needs unsteady aerodynamics (Theodorsen), which is outside this module's
+scope.
 
-### Cómo se dibuja
+### How it's drawn
 
-La flecha real de la punta a 30 m/s es de **décimas de milímetro**: físicamente
-correcta e invisible. El render la exagera, como cualquier post de elementos
-finitos, y **anuncia el factor en el HUD** para que nadie lo confunda con la
-deformación real. La tecla `F` lo cicla entre ×1, ×20, ×60 y ×150; la tecla `f`
-devuelve la aleta a rígida.
+The real tip deflection at 30 m/s is **tenths of a millimeter**:
+physically correct and invisible. The rendering exaggerates it, like any
+finite-element post-processing view, and **announces the factor in the
+HUD** so no one mistakes it for the real deformation. The `F` key cycles
+it between ×1, ×20, ×60, and ×150; the `f` key returns the fin to rigid.
 
-La placa se trocea en tiras a lo largo de la envergadura y cada estación se
-desplaza según la deformada estática exacta de un voladizo con carga en la
-punta, `phi(xi) = (3xi² − xi³)/2`, normalizada a 1 en la punta. Las normales se
-inclinan con la pendiente de esa curva; sin eso la iluminación sale plana y la
-curvatura no se ve. La torsión, al ser uniforme, va en el ángulo de rotación de
-la aleta, no en la forma.
+The plate is sliced into strips along the span, and each station is
+displaced according to the exact static deflected shape of a
+tip-loaded cantilever, `phi(xi) = (3xi² − xi³)/2`, normalized to 1 at the
+tip. The normals tilt with that curve's slope; without that, the lighting
+comes out flat and the curvature isn't visible. Torsion, being uniform,
+goes into the fin's rotation angle, not its shape.
 
 ---
 
-## §6 — Actuador y autopiloto
+## §6 — Actuator and autopilot
 
-### Actuador
+### Actuator
 
-`delta_cmd` (lo que pide el mixing) y `delta` (dónde está de verdad la aleta)
-son estados distintos. `servo_step()` lleva el segundo hacia el primero con:
+`delta_cmd` (what the mixing requests) and `delta` (where the fin
+actually is) are distinct states. `servo_step()` drives the latter toward
+the former with:
 
-- un **retardo de primer orden** de constante `tau_servo` (0.05 s por defecto),
-  integrado en forma exacta para no depender de que `dt << tau`;
-- un **límite de velocidad** `rate_limit` (240 °/s por defecto).
+- a **first-order lag** with time constant `tau_servo` (0.05 s by
+  default), integrated exactly so it doesn't depend on `dt << tau`;
+- a **rate limit** `rate_limit` (240 °/s by default).
 
-Con `tau_servo = rate_limit = 0` el actuador es ideal y `delta = delta_cmd`.
-Tecla `S` en el modo gráfico, `servo on|off` en headless.
+With `tau_servo = rate_limit = 0` the actuator is ideal and
+`delta = delta_cmd`. Key `S` in graphics mode, `servo on|off` in headless
+mode.
 
-### Autopiloto
+### Autopilot
 
-Tres PID independientes, uno por irrep. **Que esto funcione es precisamente lo
-que compran §2 y §4**: si el mando o el amortiguamiento acoplaran los ejes,
-haría falta un controlador MIMO.
+Three independent PIDs, one per irrep. **The fact that this works is
+exactly what §2 and §4 buy you**: if the command or the damping coupled
+the axes, a MIMO controller would be needed.
 
-Cada canal se sintoniza por asignación de polos sobre el modelo linealizado.
-Para cabeceo (los otros dos son idénticos cambiando la inercia y las
-derivadas):
+Each channel is tuned by pole placement on the linearized model. For
+pitch (the other two are identical, swapping in the inertia and
+derivatives):
 
 ```
-  Iyy · theta̎ = M_du · u + M_q · q          con  u = kp·err − kd·q
+  Iyy · theta̎ = M_du · u + M_q · q          with  u = kp·err − kd·q
 
   =>   kp = wn² · Iyy / M_du
        kd = (2·zeta·wn·Iyy + M_q) / M_du
        ki = kp · wn / 5
 ```
 
-`M_q` **ya es negativo**, de ahí el `+` en `kd`: el controlador solo aporta el
-amortiguamiento que la aerodinámica no da. La integral es lenta a propósito —
-sirve de trim, no domina el lazo — y lleva anti-windup contra la saturación de
-salida.
+`M_q` **is already negative**, hence the `+` in `kd`: the controller only
+supplies the damping the aerodynamics doesn't provide. The integral term
+is deliberately slow — it acts as trim, not as the dominant term in the
+loop — and carries anti-windup against output saturation.
 
-Por defecto `wn = 3.0 / 1.5 / 1.5 rad/s` y `zeta = 0.8`. Las ganancias
-resultantes:
+By default `wn = 3.0 / 1.5 / 1.5 rad/s` and `zeta = 0.8`. The resulting
+gains:
 
 ```
 PID roll    kp   +2.6584  ki   +1.5950  kd   +1.4083  (wn 3.00)
@@ -393,25 +406,25 @@ PID pitch   kp   +2.5292  ki   +0.7587  kd   +2.6394  (wn 1.50)
 PID yaw     kp   -2.7222  ki   -0.8167  kd   -2.8453  (wn 1.50)
 ```
 
-> **Las ganancias de guiñada salen negativas.** No es un error de signo: es
-> `N_du < 0` de §2 propagándose hasta el controlador. Merece la pena dejarlas
-> negativas en vez de esconder el signo en el mixing, porque así la convención
-> de Blakelock es visible de punta a punta.
+> **The yaw gains come out negative.** This isn't a sign error: it's
+> `N_du < 0` from §2 propagating all the way to the controller. It's
+> worth leaving them negative instead of hiding the sign in the mixing,
+> because it keeps the Blakelock convention visible end to end.
 
-La derivada se toma de la **velocidad angular medida**, no de `d(err)/dt`, para
-que un salto en la referencia no dé patada derivativa. Cada canal satura en
-`0.7 · delta_stall`; como el mixing suma cabeceo y alabeo sobre la misma aleta,
-un escalón agresivo en dos ejes a la vez sí puede pedir más de `delta_stall`
-en una aleta concreta — el clamp de §3 se encarga, y el lazo converge igual
-(caso 12 de §7).
+The derivative term is taken from the **measured angular velocity**, not
+from `d(err)/dt`, so a step in the reference doesn't produce derivative
+kick. Each channel saturates at `0.7 · delta_stall`; since the mixing sums
+pitch and roll onto the same fin, an aggressive step on two axes at once
+can indeed request more than `delta_stall` on a given fin — the clamp
+from §3 handles it, and the loop still converges (test case 12 in §7).
 
-Teclas `A` (activar), `C` (mantener la actitud actual). Con el autopiloto
-activo, las flechas y `Q`/`E` mueven **referencias de actitud** en vez de
-mando directo: la misma palanca, una capa más arriba del lazo.
+Keys `A` (engage), `C` (hold the current attitude). With the autopilot
+engaged, the arrow keys and `Q`/`E` move **attitude references** instead
+of direct commands: the same stick, one layer higher up the loop.
 
-### El tensor de inercia
+### The inertia tensor
 
-`rotational_dynamics()` usa el tensor con simetría XZ completo:
+`rotational_dynamics()` uses the full XZ-symmetric tensor:
 
 ```
   I = [ Ixx   0   -Ixz ]                     Gamma = Ixx·Izz − Ixz²
@@ -419,116 +432,118 @@ mando directo: la misma palanca, una capa más arriba del lazo.
       [-Ixz   0    Izz ]                            [ Ixz  Ixx ]
 ```
 
-Por defecto `Ixz = 0`. Ponlo a algo distinto (`set Ixz 2.0`) y aparece el
-acoplo alabeo–guiñada clásico: un mando de alabeo puro genera `r`, **aunque el
-momento aerodinámico `N` de mando siga siendo exactamente cero**. El acoplo es
-inercial, del término `omega × I·omega`, no aerodinámico. El caso 13 de §7
-separa las dos cosas.
+`Ixz = 0` by default. Set it to something else (`set Ixz 2.0`) and the
+classic roll-yaw inertial coupling appears: a pure roll command generates
+`r`, **even though the commanded aerodynamic moment `N` stays exactly
+zero**. The coupling is inertial, from the `omega × I·omega` term, not
+aerodynamic. Test case 13 in §7 separates the two.
 
 ---
 
-## §7 — Casos de validación
+## §7 — Validation cases
 
-`make test` (C++) y `make python-test` (Python) corren los mismos 18 casos, 79
-comprobaciones:
+`make test` (C++) and `make python-test` (Python) run the same 18 cases,
+79 checks:
 
-| # | Qué comprueba |
+| # | What it checks |
 |---|---|
-| 1–3 | Cabeceo, guiñada y alabeo puros: un solo momento, ceros exactos en los otros dos ejes, signo correcto. |
-| 4 | `demix(mix(u)) == u` en cuatro casos (error < 1e-16). |
-| 5 | Saturación por pérdida: simétrica, plana por encima, lineal por debajo. |
-| 6 | Norma del cuaternión tras 1e4 pasos con los tres canales excitados. |
-| 7 | Comando combinado: los momentos coinciden con las fórmulas cerradas de §2. |
-| 8 | **Amortiguamiento diagonal**: `p` → solo `L`, `q` → solo `M`, `r` → solo `N`; los tres se oponen al giro; coinciden con `L_p`, `M_q`, `N_r`. |
-| 9 | **Régimen permanente** `omega_ss = V·u/brazo` en los tres ejes, y `delta_eff → 0` en equilibrio. |
-| 10 | Contraste con `damping_on = false`: rampa lineal exacta, sin equilibrio. |
-| 11 | Actuador: `rate_limit·dt` en un paso; `1 − 1/e` en `t = tau`; salto instantáneo con ambos a cero. |
-| 12 | Autopiloto: converge a (10°, 5°, −8°) con error < 0.2° y velocidades residuales nulas; `kp` de guiñada negativa. |
-| 13 | `Ixz`: aparece `r` con mando de alabeo puro, pero el `N` **de mando** sigue siendo cero. |
-| 14 | `params_update_aero()`: cambiar `S_fin` recalcula `AR` y `CL_delta`. |
-| 15 | **Aeroelasticidad estática**: `delta_eff/delta == eta`; la aleta se destuerce; la flecha vale `f/K_bend`; `theta1 == theta2`, así que el desacoplo de §2 aguanta. |
-| 16 | `eta` cae monótona con `V`, vale exactamente 1/2 en `qbar_car`, y es 1 **exacto** con la aleta rígida. |
-| 17 | **Divergencia** con `e_ea < 0`: `eta > 1`, vale 10 al 90% de `qbar_div`, y la torsión cambia de signo. |
-| 18 | Modos estructurales y CFL: `dt = 2 ms` los resuelve, `dt = 10 ms` no (y avisa antes de dar NaN). |
+| 1–3 | Pure pitch, yaw, and roll: a single moment, exact zeros on the other two axes, correct sign. |
+| 4 | `demix(mix(u)) == u` in four cases (error < 1e-16). |
+| 5 | Stall saturation: symmetric, flat above, linear below. |
+| 6 | Quaternion norm after 1e4 steps with all three channels excited. |
+| 7 | Combined command: moments match the closed-form formulas from §2. |
+| 8 | **Diagonal damping**: `p` → only `L`, `q` → only `M`, `r` → only `N`; all three oppose the rotation; match `L_p`, `M_q`, `N_r`. |
+| 9 | **Steady-state regime** `omega_ss = V·u/arm` on all three axes, and `delta_eff → 0` at equilibrium. |
+| 10 | Contrast with `damping_on = false`: exact linear ramp, no equilibrium. |
+| 11 | Actuator: `rate_limit·dt` in one step; `1 − 1/e` at `t = tau`; instantaneous jump with both set to zero. |
+| 12 | Autopilot: converges to (10°, 5°, −8°) with error < 0.2° and zero residual rates; negative yaw `kp`. |
+| 13 | `Ixz`: `r` appears under a pure roll command, but the **commanded** `N` stays zero. |
+| 14 | `params_update_aero()`: changing `S_fin` recomputes `AR` and `CL_delta`. |
+| 15 | **Static aeroelasticity**: `delta_eff/delta == eta`; the fin untwists; the deflection equals `f/K_bend`; `theta1 == theta2`, so the decoupling from §2 holds. |
+| 16 | `eta` decreases monotonically with `V`, equals exactly 1/2 at `qbar_car`, and is **exactly** 1 with a rigid fin. |
+| 17 | **Divergence** with `e_ea < 0`: `eta > 1`, equals 10 at 90% of `qbar_div`, and the torsion flips sign. |
+| 18 | Structural modes and CFL: `dt = 2 ms` resolves them, `dt = 10 ms` doesn't (and warns before producing NaN). |
 
-**`make paridad`** es la prueba más fuerte del módulo: comprueba que la
-implementación C++ y la de Python producen la misma traza **byte a byte**, en
-los 79 casos y en los seis scripts. Son dos implementaciones independientes
-que no pueden copiarse un error numérico la una a la otra.
+**`make paridad`** is the module's strongest test: it checks that the C++
+and Python implementations produce the exact same trace **byte for
+byte**, across the 79 cases and the six scripts. They're two independent
+implementations that can't share a numerical bug.
 
-Un detalle que cuesta encontrar la primera vez: las combinaciones
-antisimétricas (`u_roll`, `L`) son la cancelación total de cuatro números casi
-iguales, así que al converger el lazo quedan en ~1e-31 y su **signo** es ruido
-de redondeo. Por eso la impresión de estado aplasta a cero todo lo que baja de
-1e-9 (`z()` en `main.cpp`, `_z()` en el Python): sin eso, las dos trazas
-difieren en un `-0.00000` que no significa nada. Por lo mismo `qbar` se imprime
-con cuatro decimales y no tres: `rho·V²/2` cae en empates exactos (`x.xxx5`) y
-C++ y Python los rompen en direcciones opuestas.
+A detail that's hard to find the first time: the antisymmetric
+combinations (`u_roll`, `L`) are total cancellation of four nearly-equal
+numbers, so once the loop converges they land at ~1e-31 and their
+**sign** is rounding noise. That's why the state printout flushes
+anything below 1e-9 to zero (`z()` in `main.cpp`, `_z()` in the Python
+version): without that, the two traces would differ by a `-0.00000` that
+means nothing. For the same reason `qbar` is printed with four decimals
+instead of three: `rho·V²/2` lands on exact ties (`x.xxx5`), and C++ and
+Python round them in opposite directions.
 
 ---
 
-## §8 — Prototipo de referencia en Python
+## §8 — Python reference prototype
 
-`alerones_py/main.py` implementa el **mismo modelo** de forma independiente
-(NumPy + matplotlib) y ofrece tres modos:
+`alerones_py/main.py` implements the **same model** independently (NumPy
++ matplotlib) and offers three modes:
 
 ```bash
-python3 alerones_py/main.py            # animación 3D interactiva
-python3 alerones_py/main.py --test     # los 55 casos de §7
-python3 alerones_py/main.py --repl     # REPL, equivalente a --headless
+python3 alerones_py/main.py            # interactive 3D animation
+python3 alerones_py/main.py --test     # the 55 cases from §7
+python3 alerones_py/main.py --repl     # REPL, equivalent to --headless
 ```
 
-No es un juguete: es la red de seguridad del módulo. Cualquier cambio en la
-física tiene que hacerse en los dos sitios, y `make paridad` no pasa hasta que
-coinciden dígito a dígito.
+It's not a toy: it's the module's safety net. Any physics change has to
+be made in both places, and `make paridad` doesn't pass until they match
+digit for digit.
 
-Donde el Python se aparta del C++ es solo en el orden de las operaciones
-cuando eso cambiaría el resultado: `mix_commands` y `demix` están escritos en
-forma desarrollada, no como el producto matricial `MIX @ u`, porque acumular
-los sumandos en otro orden produce ceros con signo distinto. Las matrices
-`MIX` y `DEMIX` siguen en el fichero como documentación de §2.
+Where the Python deviates from the C++ is only in the order of
+operations when that would change the result: `mix_commands` and `demix`
+are written out term by term, not as the matrix product `MIX @ u`,
+because accumulating the terms in a different order produces zeros with a
+different sign. The `MIX` and `DEMIX` matrices still live in the file as
+documentation for §2.
 
 ---
 
-## §9 — Uso
+## §9 — Usage
 
-### Compilar y ejecutar
+### Build and run
 
 ```bash
-make            # compila ./alerones
-make run        # compila y abre la ventana 3D
-make test       # los 55 casos, sin gráfica
-make paridad    # C++ vs Python, byte a byte
-make figuras    # genera figuras/*.csv para el libro
-make help       # todos los targets
+make            # builds ./alerones
+make run        # builds and opens the 3D window
+make test       # the 55 cases, no graphics
+make paridad    # C++ vs Python, byte for byte
+make figuras    # generates figuras/*.csv for the write-up
+make help       # all targets
 ```
 
-Requiere `clang++` con C++17 y OpenGL/GLUT (en macOS vienen con el SDK; en
-Linux hace falta `freeglut3-dev`). El Python necesita `numpy` y `matplotlib`.
+Requires `clang++` with C++17 and OpenGL/GLUT (bundled with the SDK on
+macOS; `freeglut3-dev` needed on Linux). The Python side needs `numpy`
+and `matplotlib`.
 
-### Teclado (modo gráfico)
+### Keyboard (graphics mode)
 
-| Tecla | Acción |
+| Key | Action |
 |---|---|
-| ↑ / ↓ | `u_pitch` −/+ · con el AP activo, `theta_ref` |
-| ← / → | `u_yaw` −/+ · con el AP activo, `psi_ref` |
-| `Q` / `E` | `u_roll` −/+ · con el AP activo, `phi_ref` |
-| `1`…`4` | selecciona aleta · `+` / `-` la deflecta directamente |
-| `A` | autopiloto on/off (engancha sin salto: la referencia arranca en la actitud actual) |
-| `C` | *hold*: fija la referencia en la actitud de este instante |
-| `D` | amortiguamiento aerodinámico on/off (§4) |
-| `f` | aleta flexible / rígida (§5) |
-| `F` | exageración del dibujo de la deformación: ×1, ×20, ×60, ×150 |
-| `S` | dinámica de actuador on/off (§6) |
-| `0` | centra aletas y referencias · `R` reset · `SPACE` pausa |
-| `,` / `.` | velocidad de vuelo −/+ (resintoniza el AP: la autoridad va con `qbar`) |
-| `T` | vista de cola · `X` ejes · `W` wireframe · `ESC` salir |
-| ratón | arrastrar para orbitar, rueda para zoom |
+| ↑ / ↓ | `u_pitch` −/+ · with the AP engaged, `theta_ref` |
+| ← / → | `u_yaw` −/+ · with the AP engaged, `psi_ref` |
+| `Q` / `E` | `u_roll` −/+ · with the AP engaged, `phi_ref` |
+| `1`…`4` | select a fin · `+` / `-` deflects it directly |
+| `A` | autopilot on/off (bumpless engage: the reference starts at the current attitude) |
+| `C` | *hold*: fixes the reference at the current instant's attitude |
+| `D` | aerodynamic damping on/off (§4) |
+| `f` | flexible / rigid fin (§5) |
+| `F` | deformation-drawing exaggeration: ×1, ×20, ×60, ×150 |
+| `S` | actuator dynamics on/off (§6) |
+| `0` | center fins and references · `R` reset · `SPACE` pause |
+| `,` / `.` | flight speed −/+ (retunes the AP: authority scales with `qbar`) |
+| `T` | tail view · `X` axes · `W` wireframe · `ESC` quit |
+| mouse | drag to orbit, wheel to zoom |
 
-### Modo headless
+### Headless mode
 
-REPL por `stdin` que ignora comentarios con `#`, así que se le puede dar de
-comer cualquier fichero:
+A `stdin` REPL that ignores `#` comments, so it can be fed any file:
 
 ```bash
 ./alerones --headless < scripts/desacoplo.txt
@@ -539,56 +554,57 @@ comer cualquier fichero:
 ./alerones --headless < scripts/regresion.txt
 ```
 
-Cada script está comentado y corresponde a una sección de este documento.
-`help` dentro del REPL lista los comandos: `pitch/yaw/roll`, `fin`, `ap`,
+Each script is commented and corresponds to a section of this document.
+`help` inside the REPL lists the commands: `pitch/yaw/roll`, `fin`, `ap`,
 `ref`, `hold`, `tune`, `gains`, `damp`, `flex`, `servo`, `set`, `step`,
 `state`, `csv`, `reset`.
 
-### Figuras para el libro
+### Figures for the write-up
 
-`csv <seg> [cada] [archivo]` vuelca la trayectoria con columnas
-`t, phi, theta, psi, p, q, r, d1..d4, dc1..dc4, L, M, N` (ángulos en grados).
-`make figuras` genera los cuatro casos de referencia:
+`csv <sec> [every] [file]` dumps the trajectory with columns
+`t, phi, theta, psi, p, q, r, d1..d4, dc1..dc4, L, M, N` (angles in
+degrees). `make figuras` generates the four reference cases:
 
-| Archivo | Qué muestra |
+| File | What it shows |
 |---|---|
-| `figuras/sin_amortiguar.csv` | La rampa de §4 sin amortiguamiento. |
-| `figuras/amortiguado.csv` | La misma entrada convergiendo a `V·u/l_t`. |
-| `figuras/actuador.csv` | `dc` contra `d`: retardo y límite de velocidad. |
-| `figuras/autopiloto.csv` | Escalón de actitud a (10°, 5°, −8°). |
-| `figuras/aeroelastico.csv` | Aleta blanda: `d` contra la incidencia efectiva mientras el modo de torsión se asienta. |
+| `figuras/sin_amortiguar.csv` | The ramp from §4 without damping. |
+| `figuras/amortiguado.csv` | The same input converging to `V·u/l_t`. |
+| `figuras/actuador.csv` | `dc` vs. `d`: lag and rate limit. |
+| `figuras/autopiloto.csv` | Attitude step to (10°, 5°, −8°). |
+| `figuras/aeroelastico.csv` | Soft fin: `d` vs. effective incidence as the torsion mode settles. |
 
 ---
 
-## Qué falta a propósito
+## What's deliberately missing
 
-Para que el alcance quede escrito y no haya que deducirlo del código:
+So the scope is written down and doesn't have to be inferred from the
+code:
 
-- **Traslación.** No hay posición, velocidad ni gravedad; `V` es parámetro.
-  Está en [`unmanned/`](../../unmanned/README.md).
-- **Resistencia de las aletas y fuerza normal sobre el fuselaje.** Solo se
-  modelan momentos.
-- **Amortiguamiento del fuselaje.** Las aletas son la única superficie
-  aerodinámica, y por eso las constantes de tiempo salen largas (§4).
-- **Interferencia entre aletas y efectos de compresibilidad.** `CL_delta` es
-  constante con el Mach.
-- **Histéresis de pérdida.** El modelo post-pérdida mantiene la fuerza de
-  saturación (§3).
-- **Aerodinámica no estacionaria.** La aeroelasticidad de §5 usa aerodinámica
-  cuasi-estacionaria: basta para la eficiencia y la divergencia, que son
-  estáticas, pero no da una velocidad de flameo fiable. Para eso hace falta
-  Theodorsen.
-- **Flexión del fuselaje.** Solo se deforman las aletas; el cuerpo es rígido.
+- **Translation.** No position, velocity, or gravity; `V` is a parameter.
+  That's covered in [`unmanned/`](../../unmanned/README.md).
+- **Fin drag and normal force on the fuselage.** Only moments are
+  modeled.
+- **Fuselage damping.** The fins are the only aerodynamic surface, which
+  is why the time constants come out long (§4).
+- **Interference between fins and compressibility effects.** `CL_delta`
+  is constant with Mach number.
+- **Stall hysteresis.** The post-stall model holds the saturation force
+  constant (§3).
+- **Unsteady aerodynamics.** The aeroelasticity in §5 uses quasi-steady
+  aerodynamics: enough for efficiency and divergence, which are static,
+  but it doesn't give a reliable flutter speed. Theodorsen's theory would
+  be needed for that.
+- **Fuselage bending.** Only the fins deform; the body is rigid.
 
-## Referencias
+## References
 
-- J. H. Blakelock, *Automatic Control of Aircraft and Missiles*, 2ª ed. —
-  convención de ejes y numeración de aletas (Fig. 8-2), control de misiles
-  cruciformes.
-- R. W. Beard y T. W. McLain, *Small Unmanned Aircraft* — cinemática del
-  cuaternión y dinámica de cuerpo rígido con `Ixz` (usadas en `unmanned/`).
-- B. Etkin y L. D. Reid, *Dynamics of Flight* — derivadas de estabilidad
+- J. H. Blakelock, *Automatic Control of Aircraft and Missiles*, 2nd ed. —
+  axis convention and fin numbering (Fig. 8-2), cruciform-missile control.
+- R. W. Beard and T. W. McLain, *Small Unmanned Aircraft* — quaternion
+  kinematics and rigid-body dynamics with `Ixz` (used in `unmanned/`).
+- B. Etkin and L. D. Reid, *Dynamics of Flight* — stability derivatives
   `L_p`, `M_q`, `N_r`.
-- H. B. Helmbold (1942) — pendiente de sustentación a alargamiento bajo.
-- R. L. Bisplinghoff, H. Ashley y R. L. Halfman, *Aeroelasticity* — eficiencia
-  de mando, divergencia y el modelo binario flexión–torsión de §5.
+- H. B. Helmbold (1942) — lift-curve slope at low aspect ratio.
+- R. L. Bisplinghoff, H. Ashley, and R. L. Halfman, *Aeroelasticity* —
+  command efficiency, divergence, and the binary bending-torsion model
+  from §5.

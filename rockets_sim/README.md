@@ -1,78 +1,76 @@
-# rockets_sim — Lanzamiento de cohetes en primera persona (mecánica Lagrangiana)
+# rockets_sim — First-person rocket launch (Lagrangian mechanics)
 
-Simulador interactivo de un lanzamiento de cohete de un solo motor, vista en
-**primera persona** desde la plataforma de lanzamiento (estilo cámara libre
-tipo shooter), con un panel de parámetros editable en vivo y telemetría de
-vuelo en tiempo real. La física se deduce con el **formalismo Lagrangiano**
-(coordenadas generalizadas, no fuerzas en marco cuerpo) e integra con
-**Runge-Kutta de 4º orden**.
+Interactive simulator of a single-engine rocket launch, viewed in **first
+person** from the launch pad (free-camera, shooter-style), with a
+live-editable parameter panel and real-time flight telemetry. The physics
+is derived with the **Lagrangian formalism** (generalized coordinates, not
+body-frame forces) and integrated with **4th-order Runge-Kutta**.
 
-Usa el mismo motor físico que [`unmanned/launch_rockets/`](../unmanned/launch_rockets/)
-(`physics.h`/`physics.cpp` son prácticamente idénticos byte a byte — ver
-[§6](#6-relación-con-unmannedlaunch_rockets)); la diferencia es el frontend:
-acá la cámara es libre y en primera persona, con un HUD de diseño de misión
-(T/W, *mass ratio*, Δv) en vez de la ventana de telemetría tipo osciloscopio
-de `unmanned/`.
+It uses the same physics engine as [`unmanned/launch_rockets/`](../unmanned/launch_rockets/)
+(`physics.h`/`physics.cpp` are near-identical byte for byte — see
+[§6](#6-relationship-with-unmannedlaunch_rockets)); the difference is the
+frontend: here the camera is free and first-person, with a mission-design
+HUD (T/W, mass ratio, Δv) instead of the oscilloscope-style telemetry
+window used in `unmanned/`.
 
-![Plataforma de lanzamiento con los paneles de parámetros y propulsión derivada, cohete aún en tierra](rocket_launch1.png)
-*Pantalla de configuración: panel de parámetros de lanzamiento (izquierda,
-arriba) y panel de propulsión derivada (izquierda, abajo) — T/W=3.33 en
-verde indica que el cohete puede despegar.*
+![Launch pad with the parameter and derived-propulsion panels, rocket still on the ground](rocket_launch1.png)
+*Setup screen: launch-parameter panel (top left) and derived-propulsion
+panel (bottom left) — T/W=3.33 in green means the rocket can lift off.*
 
-![Cohete en fase de quema (BURN PHASE), con telemetría de vuelo en vivo](rocket_launch2.png)
-*En vuelo: panel de telemetría (derecha) con T+, altitud, velocidad, rango
-horizontal, masa restante y fase de vuelo — T+1.5 s, 24.8 m de altitud,
-36.6 m/s, todavía quemando combustible.*
+![Rocket in the burn phase (BURN PHASE), with live flight telemetry](rocket_launch2.png)
+*In flight: telemetry panel (right) with T+, altitude, speed, horizontal
+range, remaining mass, and flight phase — T+1.5 s, 24.8 m altitude,
+36.6 m/s, still burning fuel.*
 
-## 1. Coordenadas generalizadas y Lagrangiano
+## 1. Generalized coordinates and Lagrangian
 
-Estado del cohete en el marco inercial **Este-Norte-Arriba** (no marco
-cuerpo, a diferencia del motor 6DOF de `unmanned/`):
+Rocket state in the inertial **East-North-Up** frame (not the body frame
+used by `unmanned/`'s 6DOF engine):
 
 ```
-q  = (x, y, z)         posicion [m]
-q̇  = (ẋ, ẏ, ż)         velocidad [m/s]
-m(t)                    masa, decrece mientras hay combustible [kg]
+q  = (x, y, z)         position [m]
+q̇  = (ẋ, ẏ, ż)         velocity [m/s]
+m(t)                    mass, decreases while there's fuel [kg]
 ```
 
 ```
-T = ½ m(t) (ẋ² + ẏ² + ż²)      energia cinetica
-V = m(t) · g · z                 energia potencial
-L = T − V                        Lagrangiano
+T = ½ m(t) (ẋ² + ẏ² + ż²)      kinetic energy
+V = m(t) · g · z                 potential energy
+L = T − V                        Lagrangian
 ```
 
-## 2. Ecuaciones de Euler-Lagrange
+## 2. Euler-Lagrange equations
 
-Con fuerzas generalizadas no conservativas `Qi` (empuje + arrastre):
+With non-conservative generalized forces `Qi` (thrust + drag):
 
 ```
 d/dt(∂L/∂q̇i) − ∂L/∂qi = Qi
 
-→  m·ẍ = Fx_empuje + Fx_arrastre
-→  m·ÿ = Fy_empuje + Fy_arrastre
-→  m·z̈ = −m·g + Fz_empuje + Fz_arrastre
-   ṁ    = −flujo_combustible        (solo durante la quema)
+→  m·ẍ = Fx_thrust + Fx_drag
+→  m·ÿ = Fy_thrust + Fy_drag
+→  m·z̈ = −m·g + Fz_thrust + Fz_drag
+   ṁ    = −fuel_flow_rate        (burn phase only)
 ```
 
-## 3. Fuerzas y parámetros derivados (`physics.h` / `physics.cpp`)
+## 3. Forces and derived parameters (`physics.h` / `physics.cpp`)
 
-| Fuerza | Modelo |
+| Force | Model |
 |---|---|
-| Gravedad | `Fg = (0, 0, −m·g)` |
-| Empuje | `Ft = thrustDir(θ,φ) · T`, activo mientras `t < burn_time` y queda combustible |
-| Arrastre aerodinámico | `Fd = −½·ρ(z)·Cd·A·\|v\|·v̂` |
-| Pérdida de masa | `ṁ = −fuel_mass / burn_time` (consumo lineal durante la quema) |
+| Gravity | `Fg = (0, 0, −m·g)` |
+| Thrust | `Ft = thrustDir(θ,φ) · T`, active while `t < burn_time` and fuel remains |
+| Aerodynamic drag | `Fd = −½·ρ(z)·Cd·A·\|v\|·v̂` |
+| Mass loss | `ṁ = −fuel_mass / burn_time` (linear burn-off during the burn phase) |
 
-**Dirección del empuje** — coordenadas esféricas estándar de física,
-`θ` polar desde el cenit (+Z) y `φ` azimutal desde el Este (+X):
+**Thrust direction** — standard physics spherical coordinates, `θ` polar
+from zenith (+Z) and `φ` azimuthal from East (+X):
 
 ```
 thrustDir(θ,φ) = ( sin θ·cos φ,  sin θ·sin φ,  cos θ )
 ```
 
-**Empuje a partir del impulso específico** (ecuación del cohete) en vez de
-pedir la fuerza directamente — así el parámetro editable es `Isp`, una
-cifra de mérito real del motor, no un número arbitrario de Newtons:
+**Thrust from specific impulse** (rocket equation) instead of asking for
+force directly — so the editable parameter is `Isp`, a real engine figure
+of merit, not an arbitrary number of Newtons:
 
 ```
 mdot      = fuel_mass_kg / burn_time_s
@@ -82,23 +80,23 @@ T/W       = thrustN / (total_mass_kg · g₀)
 massRatio = total_mass_kg / dry_mass_kg
 ```
 
-Estas 4 cantidades derivadas son exactamente el panel **PROPULSION
-(derived)** del HUD (sección 5), con código de color: T/W en rojo si
-`<1` (no despega), amarillo `1–1.5` (marginal), verde `>1.5`; *mass ratio*
-en naranja si `<2`, amarillo `2–4`, verde `>4`.
+These 4 derived quantities are exactly the HUD's **PROPULSION (derived)**
+panel (section 5), color-coded: T/W red if `<1` (won't lift off), yellow
+`1–1.5` (marginal), green `>1.5`; mass ratio orange if `<2`, yellow `2–4`,
+green `>4`.
 
-**Atmósfera** — densidad exponencial tipo ISA (igual que
-`unmanned/launch_rockets/`), afecta el arrastre con la altitud:
+**Atmosphere** — exponential ISA-type density (same as
+`unmanned/launch_rockets/`), affects drag with altitude:
 
 ```
-rho(z) = 1.225 · e^(−z / 8500)        (kg/m³, z en metros)
+rho(z) = 1.225 · e^(−z / 8500)        (kg/m³, z in meters)
 ```
 
-## 4. Integración: Runge-Kutta 4
+## 4. Integration: 4th-order Runge-Kutta
 
-Mismo esquema clásico de 4 etapas y pesos 1-2-2-1 que el resto de los
-simuladores de este repositorio (`unmanned/`, `aerodynamical_controls/`),
-aplicado aquí a las 7 variables de estado (posición, velocidad, masa):
+Same classic 4-stage scheme with 1-2-2-1 weights as the rest of this
+repo's simulators (`unmanned/`, `aerodynamical_controls/`), applied here
+to the 7 state variables (position, velocity, mass):
 
 ```
 k1 = f(t,        y)
@@ -109,22 +107,22 @@ k4 = f(t+h,      y + h·k3)
 y_{n+1} = y_n + (h/6)(k1 + 2·k2 + 2·k3 + k4)
 ```
 
-4 subpasos por frame de render (≈240 Hz efectivo de integración a 60 fps de
-pantalla). El impacto contra el piso se detecta por `rocket.pos.z < 0`,
-momento en el que la simulación se congela y el HUD muestra `** IMPACT **`.
+4 sub-steps per render frame (≈240 Hz effective integration rate at 60 fps
+on screen). Ground impact is detected via `rocket.pos.z < 0`, at which
+point the simulation freezes and the HUD shows `** IMPACT **`.
 
-## 5. HUD y controles (`main.cpp`)
+## 5. HUD and controls (`main.cpp`)
 
-Tres paneles en pantalla, consumiendo directamente el estado de
-`LaunchParams` / `RocketState`:
+Three on-screen panels, driven directly by the `LaunchParams` /
+`RocketState` state:
 
-- **`LAUNCH PARAMETERS`** (arriba izquierda) — los 8 parámetros editables
-  de la misión, con su rango válido:
+- **`LAUNCH PARAMETERS`** (top left) — the 8 editable mission parameters,
+  with their valid range:
 
-  | # | Parámetro | Paso | Rango | Default |
+  | # | Parameter | Step | Range | Default |
   |---|---|---|---|---|
-  | 1 | Theta (ángulo polar desde el cenit) | 5° | 1–179° | 20° |
-  | 2 | Phi (azimut desde el Este) | 10° | 0–359° | 255° |
+  | 1 | Theta (polar angle from zenith) | 5° | 1–179° | 20° |
+  | 2 | Phi (azimuth from East) | 10° | 0–359° | 255° |
   | 3 | Isp | 10 s | 100–500 s | 100 s |
   | 4 | Burn time | 1 s | 1–120 s | 2 s |
   | 5 | Total mass | 10 kg | 10–5000 kg | 12 kg |
@@ -132,76 +130,77 @@ Tres paneles en pantalla, consumiendo directamente el estado de
   | 7 | Drag Cd | 0.05 | 0.05–2.0 | 0.5 |
   | 8 | Area | 0.005 m² | 0.005–0.5 m² | 0.05 m² |
 
-- **`PROPULSION (derived)`** (abajo izquierda) — Thrust, T/W, Mass Ratio,
-  Δv ideal y la fórmula de densidad atmosférica en uso (sección 3). Si
-  T/W < 1 antes de lanzar, aparece una advertencia central
-  `EMPUJE INSUFICIENTE  T/W < 1` con el empuje mínimo necesario.
-- **`TELEMETRY`** (arriba derecha, solo durante/después del vuelo) — `T+`
-  (tiempo transcurrido), altitud, velocidad, rango horizontal desde la
-  plataforma, masa restante, y la **fase de vuelo**: `BURN PHASE`
-  (quemando combustible) → `COAST PHASE` (en inercia, motor apagado) →
-  `** IMPACT **` (al tocar el piso).
+- **`PROPULSION (derived)`** (bottom left) — Thrust, T/W, Mass Ratio,
+  ideal Δv, and the atmospheric density formula in use (section 3). If
+  T/W < 1 before launch, a central warning appears:
+  `EMPUJE INSUFICIENTE  T/W < 1` (insufficient thrust) along with the
+  minimum thrust needed — this string is literal on-screen HUD text, left
+  untranslated here to match what the program actually prints.
+- **`TELEMETRY`** (top right, only during/after flight) — `T+` (elapsed
+  time), altitude, speed, horizontal range from the pad, remaining mass,
+  and the **flight phase**: `BURN PHASE` (burning fuel) → `COAST PHASE`
+  (coasting, engine off) → `** IMPACT **` (on touching the ground).
 
-| Tecla | Acción |
+| Key | Action |
 |---|---|
-| `SPACE` | Lanzar |
-| `R` | Reset — vuelve a la configuración |
-| `1`–`8` | Seleccionar parámetro |
-| `+` / `-` | Ajustar el parámetro seleccionado (paso de la tabla de arriba) |
-| `ENTER` | Editar el valor del parámetro seleccionado directamente (teclado numérico) |
-| `W A S D` | Mover la cámara |
-| Flechas / arrastrar con el mouse | Rotar la vista |
-| `T` | Alternar cámara de seguimiento automático del cohete |
-| `ESC` | Salir |
+| `SPACE` | Launch |
+| `R` | Reset — back to setup |
+| `1`–`8` | Select parameter |
+| `+` / `-` | Adjust the selected parameter (step size from the table above) |
+| `ENTER` | Edit the selected parameter's value directly (numeric entry) |
+| `W A S D` | Move the camera |
+| Arrow keys / mouse drag | Rotate the view |
+| `T` | Toggle automatic rocket-tracking camera |
+| `ESC` | Quit |
 
-Con los valores por defecto el cohete sube ~1–2 km y traza una curva
-balística visible desde el suelo.
+With the default values the rocket climbs ~1–2 km and traces a ballistic
+arc visible from the ground.
 
-## 6. Relación con `unmanned/launch_rockets/`
+## 6. Relationship with `unmanned/launch_rockets/`
 
-Este proyecto y [`unmanned/launch_rockets/`](../unmanned/launch_rockets/)
-comparten el mismo motor físico (`physics.h` es idéntico byte a byte;
-`physics.cpp` difiere en una sola línea de comentario) — es la misma
-mecánica Lagrangiana descrita en la [sección 13 del README de
-`unmanned/`](../unmanned/README.md#13-launch_rockets--mecánica-lagrangiana-de-un-cohete).
-Lo que cambia es el programa que lo envuelve: `unmanned/launch_rockets/`
-es un visor con cámara orbital/de seguimiento más simple; `rockets_sim/`
-es una consola de diseño de misión en primera persona, con el panel de
-propulsión derivada (T/W, *mass ratio*, Δv) y la validación de
-despegue (`T/W < 1`) que el otro no tiene.
+This project and [`unmanned/launch_rockets/`](../unmanned/launch_rockets/)
+share the same physics engine (`physics.h` is byte-for-byte identical;
+`physics.cpp` differs by a single comment line) — it's the same Lagrangian
+mechanics described in [section 13 of the `unmanned/`
+README](../unmanned/README.md#13-launch_rockets--rocket-lagrangian-mechanics).
+What changes is the wrapping program: `unmanned/launch_rockets/` is a
+simpler orbital/tracking-camera viewer; `rockets_sim/` is a first-person
+mission-design console, with the derived-propulsion panel (T/W, mass
+ratio, Δv) and the liftoff validation (`T/W < 1`) that the other one
+lacks.
 
-## Compilar y ejecutar
+## Build and run
 
 ```bash
 cmake -B build && cmake --build build
 ./build/rocket_sim
 ```
 
-Requiere macOS con OpenGL + GLUT (incluidos por defecto en el SDK); en
+Requires macOS with OpenGL + GLUT (included by default in the SDK); on
 Linux, `freeglut3-dev`.
 
-## Estructura del proyecto
+## Project structure
 
-| Archivo | Rol |
+| File | Role |
 |---|---|
 | `CMakeLists.txt` | Build system. |
-| `physics.h` | Structs `Vec3`, `RocketState`, `LaunchParams` (con los derivados de §3) + declaraciones. |
-| `physics.cpp` | Euler-Lagrange (`computeDerivs`) + integrador RK4 (`rk4Step`). |
-| `main.cpp` | Ventana GLUT, cámara en primera persona, HUD (parámetros/propulsión/telemetría), renderizado 3D, manejo de teclado. |
-| `rocket_launch1.png`, `rocket_launch2.png` | Capturas reales de la simulación, usadas arriba en este README. |
+| `physics.h` | `Vec3`, `RocketState`, `LaunchParams` structs (with the derived quantities from §3) + declarations. |
+| `physics.cpp` | Euler-Lagrange (`computeDerivs`) + RK4 integrator (`rk4Step`). |
+| `main.cpp` | GLUT window, first-person camera, HUD (parameters/propulsion/telemetry), 3D rendering, keyboard handling. |
+| `rocket_launch1.png`, `rocket_launch2.png` | Real screenshots of the simulation, used above in this README. |
 
-## Próximos pasos posibles
+## Possible next steps
 
-- Variación de densidad del aire con altitud ya modelada (ISA); falta
-  variar también la gravedad o la temperatura con la altura si se
-  necesita más fidelidad.
-- Etapas múltiples (separación de cohetes).
-- Visualizar la curva de energía `T`, `V`, `H = T + V` en el HUD.
-- Exportar la trayectoria a CSV para análisis externo.
-- Reemplazar GLUT por GLFW + Dear ImGui para una UI más rica.
+- Air-density variation with altitude is already modeled (ISA); gravity or
+  temperature variation with altitude is still missing if more fidelity is
+  needed.
+- Multi-stage rockets (stage separation).
+- Visualize the `T`, `V`, `H = T + V` energy curve in the HUD.
+- Export the trajectory to CSV for external analysis.
+- Replace GLUT with GLFW + Dear ImGui for a richer UI.
 
-## Referencia
+## Reference
 
-Mecánica Lagrangiana estándar (Goldstein, *Classical Mechanics*) aplicada a
-un cuerpo de masa variable; ecuación del cohete de Tsiolkovsky para el
-empuje a partir del impulso específico.
+Standard Lagrangian mechanics (Goldstein, *Classical Mechanics*) applied to
+a variable-mass body; the Tsiolkovsky rocket equation for thrust from
+specific impulse.

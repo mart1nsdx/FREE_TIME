@@ -1,58 +1,56 @@
-# UAV-s- — Simulación, control y detección de vehículos aéreos no tripulados
+# UAV-s- — Simulation, control, and detection of unmanned aerial vehicles
 
-Repositorio con cinco proyectos: tres de simulación física en C++ (dos
-basados en las ecuaciones de Beard & McLain, *Small Unmanned Aircraft:
-Theory and Practice*, y uno de mecánica Lagrangiana), uno de
-diseño/análisis de radar en MATLAB, y uno de material de curso sobre
-arquitectura de sistemas complejos. Los cuatro primeros están pensados
-para compilarse/correrse tal cual al clonar este repo.
+Repository with five projects: three physics simulations in C++ (two based
+on Beard & McLain's equations, *Small Unmanned Aircraft: Theory and
+Practice*, and one on Lagrangian mechanics), one radar design/analysis
+project in MATLAB, and one course-material project on complex systems
+architecture. The first four are meant to be compiled/run as-is once you
+clone this repo.
 
-## Proyectos
+## Projects
 
-| Carpeta | Qué hace | README |
+| Folder | What it does | README |
 |---|---|---|
-| [`unmanned/`](unmanned/README.md) | Motor de vuelo **6DOF completo** (posición + actitud) de tres vehículos — UAV ala delta, quadcopter y convertiplano de rotores basculantes — con visualización 3D interactiva, telemetría en vivo, campo de obstáculos y una demo de consola. Incluye además, como módulo aparte, una simulación de lanzamiento de cohete con mecánica Lagrangiana (`unmanned/launch_rockets/`). | [`unmanned/README.md`](unmanned/README.md) |
-| [`aerodynamical_controls/`](aerodynamical_controls/README.md) | Dinámica de **actitud** (sin posición ni traslación) de un cohete con cuatro aletas traseras en cruz: desacoplo por simetría, amortiguamiento aerodinámico, aeroelasticidad de aleta flexible, dinámica de actuador y autopiloto PID. Validado con 79 casos de test y paridad byte a byte entre una implementación en C++ y otra en Python. | [`aerodynamical_controls/README.md`](aerodynamical_controls/README.md) |
-| [`rockets_sim/`](rockets_sim/README.md) | Lanzamiento de cohetes en **primera persona** con mecánica Lagrangiana (mismo motor que `unmanned/launch_rockets/`): panel de parámetros de misión editable en vivo (ángulo, Isp, masas, arrastre), panel de propulsión derivada (T/W, *mass ratio*, Δv) y telemetría de vuelo en tiempo real. | [`rockets_sim/README.md`](rockets_sim/README.md) |
-| [`MATLAB_RADAR/`](MATLAB_RADAR/README.md) | Diseño y análisis de un **radar PMCW** para detección de UAVs pequeños (presupuesto de detectabilidad, Pd vs. rango, cobertura rango-Doppler, dos modelos de refracción atmosférica) más el diseño físico preliminar del arreglo de antenas de 64Tx/64Rx a 79 GHz que lo alimentaría. | [`MATLAB_RADAR/README.md`](MATLAB_RADAR/README.md) |
-| [`MIT_Architecture_of_Complex_Systems/`](MIT_Architecture_of_Complex_Systems/README.md) | Material de curso (MIT xPro, *Architecture and Systems Engineering*): entregables semanales sobre cómo descomponer sistemas complejos, evaluar decisiones de arquitectura e Ingeniería de Sistemas Basada en Modelos (MBSE). No es código — son los PDFs de los trabajos del curso. | [`MIT_Architecture_of_Complex_Systems/README.md`](MIT_Architecture_of_Complex_Systems/README.md) |
+| [`unmanned/`](unmanned/README.md) | **Full 6DOF** flight engine (position + attitude) for three vehicles — delta-wing UAV, quadcopter, and tilt-rotor convertiplane — with an interactive 3D visualization, live telemetry, an obstacle field, and a console demo. Also includes, as a separate module, a rocket-launch simulation built on Lagrangian mechanics (`unmanned/launch_rockets/`). | [`unmanned/README.md`](unmanned/README.md) |
+| [`aerodynamical_controls/`](aerodynamical_controls/README.md) | **Attitude** dynamics (no position or translation) of a rocket with four cruciform tail fins: symmetry-based decoupling, aerodynamic damping, flexible-fin aeroelasticity, actuator dynamics, and a PID autopilot. Validated with 79 test cases and byte-for-byte parity between a C++ implementation and a Python one. | [`aerodynamical_controls/README.md`](aerodynamical_controls/README.md) |
+| [`rockets_sim/`](rockets_sim/README.md) | **First-person** rocket launch with Lagrangian mechanics (same engine as `unmanned/launch_rockets/`): a live-editable mission-parameter panel (angle, Isp, masses, drag), a derived-propulsion panel (T/W, mass ratio, Δv), and real-time flight telemetry. | [`rockets_sim/README.md`](rockets_sim/README.md) |
+| [`MATLAB_RADAR/`](MATLAB_RADAR/README.md) | Design and analysis of a **PMCW radar** for small-UAV detection (detectability budget, Pd vs. range, range-Doppler coverage, two atmospheric-refraction models), plus the preliminary physical design of the 64Tx/64Rx, 79 GHz antenna array that would feed it. | [`MATLAB_RADAR/README.md`](MATLAB_RADAR/README.md) |
+| [`MIT_Architecture_of_Complex_Systems/`](MIT_Architecture_of_Complex_Systems/README.md) | Course material (MIT xPro, *Architecture and Systems Engineering*): weekly deliverables on decomposing complex systems, evaluating architectural decisions, and Model-Based Systems Engineering (MBSE). Not code — these are the course assignment PDFs. | [`MIT_Architecture_of_Complex_Systems/README.md`](MIT_Architecture_of_Complex_Systems/README.md) |
 
-Los primeros cuatro se complementan: `unmanned/` cubre el vuelo completo de
-un vehículo rígido (dónde está y hacia dónde apunta),
-`aerodynamical_controls/` profundiza en el lazo de control de **actitud**
-de las superficies aerodinámicas que hacen posible ese vuelo, `rockets_sim/`
-es la consola de diseño de misión del mismo motor de lanzamiento de cohete
-que usa `unmanned/`, y `MATLAB_RADAR/` resuelve el problema inverso —
-**detectar** un vehículo como esos desde un radar en tierra. Cada README de
-proyecto referencia a los otros donde corresponde.
-`MIT_Architecture_of_Complex_Systems/` es aparte: es el marco conceptual
-(pensamiento sistémico, MBSE) detrás de cómo se piensa un vehículo como
-cualquiera de los anteriores como un sistema completo, no código de
-simulación en sí.
+The first four complement each other: `unmanned/` covers the complete
+flight of a rigid vehicle (where it is and which way it's pointing),
+`aerodynamical_controls/` dives into the **attitude**-control loop of the
+aerodynamic surfaces that make that flight possible, `rockets_sim/` is the
+mission-design console for the same rocket-launch engine used by
+`unmanned/`, and `MATLAB_RADAR/` solves the inverse problem — **detecting**
+a vehicle like those from a ground-based radar. Each project's README
+references the others where relevant. `MIT_Architecture_of_Complex_Systems/`
+stands apart: it's the conceptual framework (systems thinking, MBSE) behind
+treating a vehicle like any of the above as a complete system, not
+simulation code itself.
 
-| `unmanned/` — UAV ala delta en vuelo, telemetría en vivo | `aerodynamical_controls/` — cohete con aletas cruciformes, vista de cola y HUD |
+| `unmanned/` — delta-wing UAV in flight, live telemetry | `aerodynamical_controls/` — rocket with cruciform fins, tail view and HUD |
 |---|---|
-| ![UAV ala delta en vuelo, con la ventana de telemetría en vivo](unmanned/ala_delta.png) | ![Cohete con aletas cruciformes en vuelo, con vista de cola y HUD de actitud](aerodynamical_controls/simulacion_alerones/aerodynamical_controls.png) |
+| ![Delta-wing UAV in flight, with the live telemetry window](unmanned/ala_delta.png) | ![Rocket with cruciform fins in flight, with tail view and attitude HUD](aerodynamical_controls/simulacion_alerones/aerodynamical_controls.png) |
 
-| `rockets_sim/` — plataforma de lanzamiento, panel de propulsión derivada | `rockets_sim/` — cohete en fase de quema, telemetría en vivo |
+| `rockets_sim/` — launch pad, derived-propulsion panel | `rockets_sim/` — rocket in burn phase, live telemetry |
 |---|---|
-| ![Plataforma de lanzamiento con paneles de parámetros y propulsión derivada](rockets_sim/rocket_launch1.png) | ![Cohete en vuelo durante la fase de quema, con telemetría en vivo](rockets_sim/rocket_launch2.png) |
+| ![Launch pad with the parameter and derived-propulsion panels](rockets_sim/rocket_launch1.png) | ![Rocket in flight during the burn phase, with live telemetry](rockets_sim/rocket_launch2.png) |
 
-## Requisitos
+## Requirements
 
-`clang++` con soporte C++17. `unmanned/drone_model.cpp` y
-`aerodynamical_controls/simulacion_alerones` usan OpenGL/GLUT (en macOS
-vienen con el SDK; en Linux, `freeglut3-dev`). `unmanned/launch_rockets/` y
-`rockets_sim/` compilan con CMake (mismo requisito de OpenGL/GLUT). El
-prototipo Python de `aerodynamical_controls` necesita `numpy` y
-`matplotlib`. `MATLAB_RADAR/` necesita MATLAB con Radar Toolbox, Phased
-Array System Toolbox y Antenna Toolbox.
+`clang++` with C++17 support. `unmanned/drone_model.cpp` and
+`aerodynamical_controls/simulacion_alerones` use OpenGL/GLUT (bundled with
+the SDK on macOS; `freeglut3-dev` on Linux). `unmanned/launch_rockets/` and
+`rockets_sim/` build with CMake (same OpenGL/GLUT requirement). The Python
+prototype in `aerodynamical_controls` needs `numpy` and `matplotlib`.
+`MATLAB_RADAR/` needs MATLAB with Radar Toolbox, Phased Array System
+Toolbox, and Antenna Toolbox.
 
-Cada carpeta de proyecto trae su propio `Makefile` (o `CMakeLists.txt`) y
-su propio README con las instrucciones de compilación y ejecución
-detalladas.
+Each project folder ships its own `Makefile` (or `CMakeLists.txt`) and its
+own README with detailed build/run instructions.
 
-## Referencia
+## Reference
 
 Beard, R. W. & McLain, T. W., *Small Unmanned Aircraft: Theory and
 Practice*.
