@@ -1,10 +1,11 @@
 # UAV-s- — Simulación, control y detección de vehículos aéreos no tripulados
 
-Repositorio con cuatro proyectos independientes: tres de simulación física
-en C++ (dos basados en las ecuaciones de Beard & McLain, *Small Unmanned
-Aircraft: Theory and Practice*, y uno de mecánica Lagrangiana) y uno de
-diseño/análisis de radar en MATLAB, pensados para compilarse/correrse tal
-cual al clonar este repo.
+Repositorio con cinco proyectos: tres de simulación física en C++ (dos
+basados en las ecuaciones de Beard & McLain, *Small Unmanned Aircraft:
+Theory and Practice*, y uno de mecánica Lagrangiana), uno de
+diseño/análisis de radar en MATLAB, y uno de material de curso sobre
+arquitectura de sistemas complejos. Los cuatro primeros están pensados
+para compilarse/correrse tal cual al clonar este repo.
 
 ## Proyectos
 
@@ -14,15 +15,20 @@ cual al clonar este repo.
 | [`aerodynamical_controls/`](aerodynamical_controls/README.md) | Dinámica de **actitud** (sin posición ni traslación) de un cohete con cuatro aletas traseras en cruz: desacoplo por simetría, amortiguamiento aerodinámico, aeroelasticidad de aleta flexible, dinámica de actuador y autopiloto PID. Validado con 79 casos de test y paridad byte a byte entre una implementación en C++ y otra en Python. | [`aerodynamical_controls/README.md`](aerodynamical_controls/README.md) |
 | [`rockets_sim/`](rockets_sim/README.md) | Lanzamiento de cohetes en **primera persona** con mecánica Lagrangiana (mismo motor que `unmanned/launch_rockets/`): panel de parámetros de misión editable en vivo (ángulo, Isp, masas, arrastre), panel de propulsión derivada (T/W, *mass ratio*, Δv) y telemetría de vuelo en tiempo real. | [`rockets_sim/README.md`](rockets_sim/README.md) |
 | [`MATLAB_RADAR/`](MATLAB_RADAR/README.md) | Diseño y análisis de un **radar PMCW** para detección de UAVs pequeños (presupuesto de detectabilidad, Pd vs. rango, cobertura rango-Doppler, dos modelos de refracción atmosférica) más el diseño físico preliminar del arreglo de antenas de 64Tx/64Rx a 79 GHz que lo alimentaría. | [`MATLAB_RADAR/README.md`](MATLAB_RADAR/README.md) |
+| [`MIT_Architecture_of_Complex_Systems/`](MIT_Architecture_of_Complex_Systems/README.md) | Material de curso (MIT xPro, *Architecture and Systems Engineering*): entregables semanales sobre cómo descomponer sistemas complejos, evaluar decisiones de arquitectura e Ingeniería de Sistemas Basada en Modelos (MBSE). No es código — son los PDFs de los trabajos del curso. | [`MIT_Architecture_of_Complex_Systems/README.md`](MIT_Architecture_of_Complex_Systems/README.md) |
 
-Se complementan: `unmanned/` cubre el vuelo completo de un vehículo rígido
-(dónde está y hacia dónde apunta), `aerodynamical_controls/` profundiza en
-el lazo de control de **actitud** de las superficies aerodinámicas que
-hacen posible ese vuelo, `rockets_sim/` es la consola de diseño de misión
-del mismo motor de lanzamiento de cohete que usa `unmanned/`, y
-`MATLAB_RADAR/` resuelve el problema inverso — **detectar** un vehículo
-como esos desde un radar en tierra. Cada README de proyecto referencia a
-los otros donde corresponde.
+Los primeros cuatro se complementan: `unmanned/` cubre el vuelo completo de
+un vehículo rígido (dónde está y hacia dónde apunta),
+`aerodynamical_controls/` profundiza en el lazo de control de **actitud**
+de las superficies aerodinámicas que hacen posible ese vuelo, `rockets_sim/`
+es la consola de diseño de misión del mismo motor de lanzamiento de cohete
+que usa `unmanned/`, y `MATLAB_RADAR/` resuelve el problema inverso —
+**detectar** un vehículo como esos desde un radar en tierra. Cada README de
+proyecto referencia a los otros donde corresponde.
+`MIT_Architecture_of_Complex_Systems/` es aparte: es el marco conceptual
+(pensamiento sistémico, MBSE) detrás de cómo se piensa un vehículo como
+cualquiera de los anteriores como un sistema completo, no código de
+simulación en sí.
 
 | `unmanned/` — UAV ala delta en vuelo, telemetría en vivo | `aerodynamical_controls/` — cohete con aletas cruciformes, vista de cola y HUD |
 |---|---|
