@@ -1,4 +1,4 @@
-# MATLAB — Diseño y análisis de radar para detección de drones
+# MATLAB_RADAR — Diseño y análisis de radar para detección de drones
 
 Colección de scripts de MATLAB (Radar Toolbox, Phased Array System Toolbox,
 Antenna Toolbox) para el diseño y análisis de un radar **PMCW** (Phase-
