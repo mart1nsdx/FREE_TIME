@@ -1,0 +1,35 @@
+# ═══════════════════════════════════════════════════════════════════════════
+#  §4 — Amortiguamiento aerodinamico por velocidad angular.
+#
+#  Con 'damp off' la velocidad angular es una rampa que no para.  Con
+#  'damp on' converge a  omega_ss = V*u/brazo:  el equilibrio es la aleta
+#  alineada con el flujo local, es decir  delta_eff = 0.
+#
+#      ./alerones --headless < scripts/amortiguamiento.txt
+# ═══════════════════════════════════════════════════════════════════════════
+
+servo off             # actuador ideal: aisla el efecto aerodinamico
+
+# ── Sin amortiguamiento: q crece sin limite ────────────────────────────────
+damp off
+pitch 3
+step 10
+state
+step 10
+state                 # q(20s) = 2*q(10s): rampa perfecta
+
+# ── Con amortiguamiento: q converge a V*u_pitch/l_t ────────────────────────
+reset
+damp on
+gains                 # imprime el omega_ss teorico
+pitch 3
+step 50
+state
+step 150
+state                 # mira "eff": la incidencia efectiva se ha ido a cero
+
+# ── El alabeo tiene el brazo mas corto: converge mucho mas alto ────────────
+reset
+roll 3
+step 200
+state

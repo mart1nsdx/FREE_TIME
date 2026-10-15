@@ -1,0 +1,32 @@
+# ═══════════════════════════════════════════════════════════════════════════
+#  §6 — Autopiloto de actitud: tres lazos SISO, uno por irrep.
+#
+#  El desacoplo de §2 y la diagonalidad del amortiguamiento de §4 son lo que
+#  permite sintonizar tres PID independientes en vez de un controlador MIMO.
+#
+#      ./alerones --headless < scripts/autopiloto.txt
+# ═══════════════════════════════════════════════════════════════════════════
+
+ap on
+gains                 # ojo: las ganancias de guinada son NEGATIVAS (N_du < 0)
+
+# ── Escalon de actitud a (phi, theta, psi) = (10, 5, -8) grados ────────────
+ref 10 5 -8
+step 5
+state                 # transitorio
+step 55
+state                 # error estacionario nulo: la integral se encarga
+
+# ── Volver al origen ───────────────────────────────────────────────────────
+ref 0 0 0
+step 60
+state
+
+# ── Lazo mas rapido: sube las frecuencias naturales y repite ───────────────
+reset
+ap on
+tune 5.0 3.0 3.0 0.8
+gains
+ref 10 5 -8
+step 10
+state                 # con wn el doble, en 10 s ya esta donde antes en 60

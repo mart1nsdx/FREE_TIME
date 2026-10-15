@@ -1,6 +1,1 @@
-drone_model
-physics_UAV
-rot_trans_kinematics
-*.o
 .DS_Store
-launch_rockets/build/

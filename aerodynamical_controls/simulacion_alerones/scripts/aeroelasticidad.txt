@@ -1,0 +1,70 @@
+# ═══════════════════════════════════════════════════════════════════════════
+#  §5 — Aeroelasticidad: la aleta deja de ser rigida.
+#
+#  Cada aleta es un sistema de dos grados de libertad (torsion y flexion)
+#  excitado por su propia fuerza aerodinamica.  La TORSION entra en el angulo
+#  de ataque y cierra un lazo: la carga retuerce la aleta, y la aleta
+#  retorcida cambia la carga.  De ahi sale un solo numero,
+#
+#      eta = 1 / (1 + qbar/qbar_car)
+#
+#  que dice que fraccion del mando llega de verdad al aire.
+#
+#      ./alerones --headless < scripts/aeroelasticidad.txt
+# ═══════════════════════════════════════════════════════════════════════════
+
+gains                 # eta, qbar_car y las frecuencias de los dos modos
+
+# ── A 30 m/s el efecto existe pero no se nota: eta = 0.9962 ────────────────
+damp off              # aisla el lazo elastico del amortiguamiento de §4
+pitch 10
+step 1
+state                 # compara "delta" (raiz) con "eff" (lo que ve el aire)
+
+# ── La aeroelasticidad es cosa de ir rapido: eta cae como 1/qbar ───────────
+reset
+set V 200
+gains                 # eta ~ 0.855
+pitch 10
+step 1
+state
+
+reset
+set V 486             # justo en qbar_car
+gains                 # eta = 0.5: la mitad del mando se pierde retorciendo
+pitch 10
+step 1
+state
+
+# ── Aleta blanda: el mismo efecto sin necesidad de ir a Mach 1.5 ───────────
+reset
+set V 30
+set K_theta 5         # servo y eje mucho mas flexibles
+gains                 # ojo: el modo de torsion baja a 9.2 Hz
+pitch 10
+step 1
+state                 # a 1 s la aleta todavia esta vibrando: eff != eta*delta
+step 5
+state                 # ya asentada: eff = 8.3976 = eta * 10 deg, exacto
+
+# ── Pivote DETRAS del centro aerodinamico: el lazo cambia de signo ─────────
+#    La carga ya no destuerce, AMPLIFICA.  Hay una presion dinamica de
+#    divergencia a la que la aleta se va a infinito.
+reset
+set K_theta 250
+set e_ea -0.02
+gains                 # eta > 1, y qbar_car pasa a ser la de divergencia
+pitch 10
+step 1
+state                 # la torsion tiene ahora el MISMO signo que el mando
+
+set V 460             # rozando la divergencia
+gains
+
+# ── Aleta rigida: todo lo anterior desaparece, eta == 1 exacto ─────────────
+reset
+flex off
+gains
+pitch 10
+step 1
+state

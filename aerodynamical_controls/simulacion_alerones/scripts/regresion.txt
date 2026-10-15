@@ -1,0 +1,59 @@
+# ═══════════════════════════════════════════════════════════════════════════
+#  Regresion corta: toca todos los subsistemas y deja una traza estable que
+#  se puede diffear entre versiones (y entre C++ y Python).
+#
+#      ./alerones --headless          < scripts/regresion.txt > a.txt
+#      python3 alerones_py/main.py --repl < scripts/regresion.txt > b.txt
+#      diff a.txt b.txt        # debe salir vacio
+# ═══════════════════════════════════════════════════════════════════════════
+
+gains
+state
+
+# mixing + trim directo
+pitch 4
+yaw -3
+roll 2
+fin 1 1.5
+step 2
+state
+
+# amortiguamiento off/on
+damp off
+step 2
+state
+damp on
+step 2
+state
+
+# actuador
+servo off
+step 1
+state
+servo on
+step 1
+state
+
+# geometria en caliente: AR debe recalcular CL_delta
+set S_fin 0.08
+set b_fin 0.30
+set V 45
+state
+
+# producto de inercia: acoplo roll-yaw
+reset
+set Ixz 2.0
+roll 5
+step 3
+state
+
+# autopiloto
+reset
+ap on
+ref 10 5 -8
+step 40
+state
+hold
+tune 5 3 3 0.7
+step 10
+state

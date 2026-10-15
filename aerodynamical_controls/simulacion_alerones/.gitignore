@@ -1,0 +1,15 @@
+# Objetos y binarios
+*.o
+alerones
+run_tests
+
+# Salidas generadas
+figuras/
+*.csv
+
+# Python
+__pycache__/
+*.pyc
+
+# macOS
+.DS_Store

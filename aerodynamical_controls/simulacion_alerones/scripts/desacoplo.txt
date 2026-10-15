@@ -1,0 +1,37 @@
+# ═══════════════════════════════════════════════════════════════════════════
+#  §2 — El desacoplo por simetria.
+#
+#  Cada canal virtual excita una sola irrep de V4 y mueve un solo eje.  Fija
+#  el ojo en la linea "moment": las otras dos componentes son cero exacto.
+#
+#      ./alerones --headless < scripts/desacoplo.txt
+# ═══════════════════════════════════════════════════════════════════════════
+
+gains                 # autoridad L_du / M_du / N_du y derivadas de estabilidad
+
+# ── Cabeceo puro: irrep simetrica del par horizontal (d1, d2) ───────────────
+pitch 5
+state
+step 1
+state
+
+# ── Guinada pura: irrep simetrica del par vertical (d3, d4) ─────────────────
+reset
+yaw 5
+state
+step 1
+state
+
+# ── Alabeo puro: irrep antisimetrica de las cuatro ─────────────────────────
+reset
+roll 5
+state
+step 1
+state
+
+# ── Comando combinado: cada eje sigue respondiendo a su propio canal ───────
+reset
+pitch 4
+yaw -3
+roll 2
+state

@@ -1,0 +1,35 @@
+# ═══════════════════════════════════════════════════════════════════════════
+#  §6 — Dinamica del actuador: retardo de primer orden + limite de velocidad.
+#
+#  Compara las lineas "cmd" (lo que pide el mixing) y "delta" (donde esta de
+#  verdad la aleta).  Con el servo ideal coinciden siempre.
+#
+#      ./alerones --headless < scripts/actuador.txt
+# ═══════════════════════════════════════════════════════════════════════════
+
+damp off              # aisla el actuador de la aerodinamica
+
+# ── Actuador ideal: cmd y delta coinciden desde el primer instante ─────────
+servo off
+pitch 10
+step 0.002
+state
+
+# ── Servo real: tras t = tau lleva 1 - 1/e = 63.2% del recorrido ──────────
+reset
+servo on
+set tau_servo 0.05
+set rate_limit 100000     # limite de velocidad practicamente infinito
+pitch 10
+step 0.05
+state                     # delta ~ 6.32 deg de los 10 pedidos
+
+# ── Limite de velocidad: 100 deg/s tarda 0.1 s en recorrer 10 deg ─────────
+reset
+set tau_servo 0
+set rate_limit 100
+pitch 10
+step 0.05
+state                     # exactamente 5 deg: la rampa es lineal
+step 0.05
+state                     # 10 deg: ya ha llegado
