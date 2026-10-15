@@ -1,4 +1,4 @@
-# UAV-s- — Simulation, control, and detection of unmanned aerial vehicles
+# PERSONAL PROJECTS IN MY FREE TIME ... 
 
 Repository with five projects: three physics simulations in C++ (two based
 on Beard & McLain's equations, *Small Unmanned Aircraft: Theory and
