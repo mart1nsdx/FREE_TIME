@@ -50,7 +50,10 @@ Toolbox, and Antenna Toolbox.
 Each project folder ships its own `Makefile` (or `CMakeLists.txt`) and its
 own README with detailed build/run instructions.
 
-## Reference
+## References
 
-Beard, R. W. & McLain, T. W., *Small Unmanned Aircraft: Theory and
-Practice*.
+- Beard, R. W. & McLain, T. W., *Small Unmanned Aircraft: Theory and
+  Practice*.
+- Goldstein, H., *Classical Mechanics*.
+- Kawai, R., *A Practical Introduction to Numerical Methods for Physics*.
+- Scherer, P. O. J., *Computational Physics*.
