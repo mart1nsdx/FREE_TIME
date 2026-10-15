@@ -18,7 +18,9 @@ rígido (dónde está y hacia dónde apunta), mientras que
 de las superficies aerodinámicas que hacen posible ese vuelo — cada README
 de proyecto referencia al otro donde corresponde.
 
-![UAV ala delta en vuelo, con la ventana de telemetría en vivo](unmanned/ala_delta.png)
+| `unmanned/` — UAV ala delta en vuelo, telemetría en vivo | `aerodynamical_controls/` — cohete con aletas cruciformes, vista de cola y HUD |
+|---|---|
+| ![UAV ala delta en vuelo, con la ventana de telemetría en vivo](unmanned/ala_delta.png) | ![Cohete con aletas cruciformes en vuelo, con vista de cola y HUD de actitud](aerodynamical_controls/simulacion_alerones/aerodynamical_controls.png) |
 
 ## Requisitos
 

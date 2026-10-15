@@ -12,6 +12,11 @@ inercias por defecto son las de `buildDeltaWingDrone()` en
 [`unmanned/physics_UAV.h`](../../unmanned/physics_UAV.h), para que los dos
 módulos hablen del mismo vehículo.
 
+![Simulación interactiva: cohete con aletas cruciformes, vista de cola y HUD de actitud/amortiguamiento/autopiloto](aerodynamical_controls.png)
+*Vista real de `alerones` corriendo: vuelo 3D con las cuatro aletas
+deflectadas, ventana de "vista de cola" (abajo) y HUD con actitud,
+flexiones, amortiguamiento y estado del autopiloto (derecha).*
+
 ## Estructura
 
 | Archivo | Rol |
@@ -23,6 +28,7 @@ módulos hablen del mismo vehículo.
 | `alerones_py/main.py` | Prototipo de referencia en Python (§8): mismo modelo, animación matplotlib, REPL y los mismos 79 casos. |
 | `scripts/*.txt` | Guiones para el modo headless, uno por sección teórica. |
 | `Makefile` | `make help` lista todos los targets. |
+| `aerodynamical_controls.png` | Captura real de `alerones` en vuelo, usada arriba en este README. |
 
 **Alcance deliberado:** este módulo simula **solo la actitud**. No hay posición
 ni velocidad de traslación: `V` es un parámetro, no un estado, y no hay
